@@ -60,6 +60,40 @@ def training(model: Module, dataset: Iterable, optim: Optimizer, loss_fun: Modul
     return losses_epoch, metrics_epoch
 
 
+def training_debug(model: Module, dataset: Iterable, optim: Optimizer, loss_fun: Module,
+                   metric_fun: Callable, device, n_steps: int =1):
+    losses, metrics = [], []
+    for batch, (x, y) in enumerate(dataset, 1):
+        print(f'batch number {batch}')
+        # Move to GPU
+        x, y = x.to(device), y.to(device)
+        # Reset gradients
+        # print('running optim.zero_grad()')
+        optim.zero_grad()
+        # Forward pass
+        # print('forward pass')
+        yhat = model(x)
+        # Performance evaluation
+        metric = metric_fun(yhat, y)
+        print(f'metric = {metric}')
+        # Compute loss
+        loss = loss_fun(yhat, y)
+        print(f'loss = {loss.item()}')
+        # Backward pass
+        # print('backward pass')
+        loss.backward()
+        # Optimization step
+        print('running optim.step()')
+        optim.step()
+
+        metrics.append(metric)
+        losses.append(loss.item())
+        if batch >= n_steps:
+            break
+
+    return losses, metrics
+
+
 def testing(model: Module, dataset: Iterable, loss_fun: Module, metric_fun: Callable, device):
     losses = []
     metrics = []

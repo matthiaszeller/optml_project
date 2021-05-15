@@ -78,7 +78,7 @@ losses, metrics = training_debug(net,
                                  CrossEntropyLoss(),
                                  accuracy,
                                  device=device,
-                                 n_steps=10)
+                                 n_steps=100)
 
 import matplotlib.pyplot as plt
 plt.plot(losses)

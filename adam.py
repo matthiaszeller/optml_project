@@ -1,4 +1,5 @@
 from typing import Optional, Callable
+import math
 
 import torch
 from torch.nn import CrossEntropyLoss
@@ -62,7 +63,6 @@ class AdamOptimizer(Optimizer):
             - there's a state for each model parameter
         """
 
-        self.state['general']['step'] = 0
         for gp in self.param_groups:
             # Initialize parameter-specific state
             for p in gp['params']:
@@ -71,54 +71,76 @@ class AdamOptimizer(Optimizer):
                     continue
 
                 if len(self.state[p]) == 0:
-                    self.state[p]['moment1'] = torch.zeros(p.size())
-                    self.state[p]['moment2'] = torch.zeros(p.size())
-                #self.state['z'] = p.data.clone()
+                    self.state[p]['step'] = 0
+                    self.state[p]['moment1'] = torch.zeros(p.data.size())
+                    self.state[p]['moment2'] = torch.zeros(p.data.size())
 
 
     def step(self, closure: Optional[Callable[[], float]] = ...) -> Optional[float]:
         # State stores the variables used by optimization algo
         # need to initialize it if empty
         if len(self.state) == 0:
-            self.__initialize_state()
+            self.__initstate__()
 
 
-        # Iterate over parameter groups (only 1 group in our case)
-        step = self.state['general']['step']
-        for gp in self.param_groups:
-            lr = gp['lr']
-            params = gp['params']
+        # Iterate over parameter groups
+        for pg in self.param_groups:
+
+            #Get all hyper parameters
+            lr = pg['lr']
+            wd = pg['weight_decay']
+            epsilon = pg['epsilon']
+            params = pg['params']
+            beta1 = pg['beta1']
+            beta2 = pg['beta2']
+
             # Iterate over parameters in the group
             for p in params:
+
+                #Get param within state
+                state_p = self.state[p]
+
+                #Increment step by 1
+                state_p['step'] += 1
+                grad = p.grad.data
+
                 #Only need to continue on parameters with gradient
-                if p.grad is None:
+                if grad is None:
                     continue
 
-                # Implementation of Adam algorithm
-                p.grad = p.grad.add(p, alpha = weight_decay)
+                #Adam does not support sparse gradients
+                if grad.is_sparse:
+                    raise RuntimeError("Adam optimizer does not support sparse gradients!")
 
-                self.bias1 = 1 - self.beta1 ** step
-                self.bias2 = 1 - self.beta2 ** step
+                #Bias corrections
+                bias1 = 1 - (beta1 ** state_p['step'])
+                bias2 = 1 - (beta2 ** state_p['step'])
 
-                self.min_beta1 = 1 - self.beta1
-                self.min_beta2 = 1 - self.beta2
+                #m_t
+                state_p['moment1'] = state_p['moment1'] * self.beta1 + (1 - self.beta1) * grad
+                #v_t
+                state_p['moment2'] = state_p['moment2'] * self.beta2 + grad * grad * (1 - self.beta2)
+
+                #Bias corrections are to be multiplied as they are non-tensor singular values
+                bias_corr = math.sqrt(bias2) / bias1
+                lr *= bias_corr
+
+                #Update parameters according to bias corrections
+                p.data = p.data - lr * state_p['moment1'] / (state_p['moment2'].sqrt() + epsilon)
+               
+                #If weight decay exists, update parameters accordingly
+                if wd != 0.0:
+                    p.data = p.data - lr * wd * p.data
 
 
-                self.state[p]['moment1'] = self.state[p]['moment1'].mul(self.beta1)
-                self.state[p]['moment1'] = self.state[p]['moment1'].add(p.grad, alpha = self.min_beta1)
-                self.state[p]['moment1'] = self.state[p]['moment1'].div(self.bias1)
-
-                self.state[p]['moment2'] = self.state[p]['moment2'].mul(self.beta2)
-                self.state[p]['moment2'] = self.state[p]['moment2'].addcmul(p.grad, p.grad, value = self.min_beta2)
-                self.state[p]['moment2'] = self.state[p]['moment2'].div(self.bias2)
-
-                self.update_val = self.state[p]['moment1'].div(torch.sqrt(self.state[p]['moment2'].add(self.epsilon)))
-                p.data = p.data.sub(self.update_val, alpha = self.lr)
-
-        # Increment step
-        self.state['general']['step'] += 1
-
-
+opt = AdamOptimizer(net.parameters())
+losses, metrics = training_debug(net,
+                                 train_loader,
+                                 opt,
+                                 CrossEntropyLoss(),
+                                 accuracy,
+                                 device=device,
+                                 n_steps=100)
 
 import matplotlib.pyplot as plt
 plt.plot(losses)

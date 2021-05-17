@@ -35,10 +35,9 @@ def fgsm(image: Tensor, data_grad: Tensor, update_max_norm: float):
 
 
 
-def attack(model: Module, chosen_opt: StringType,criterion: Module, test_loader: Iterable, update_max_norm: float, device):
+def attack(model: Module, criterion: Module, test_loader: Iterable, update_max_norm: float, device):
   """
   Executes an FGSM attack on a selected model.
-  Need to do a different thing here for each optimiser
   @return (
     accuracy of the model in the perturbed test set,
     adversarial example images: list of 5 samples of a tuple (original prediction - float, prediction - float, example image - torch.tensor)
@@ -87,20 +86,12 @@ def attack(model: Module, chosen_opt: StringType,criterion: Module, test_loader:
   return average_accuracy, adversarial_examples
 
 
-def protect(model: Module, chosen_opt: StringType,criterion: Module, train_loader: Iterable, 
-            test_loader: Iterable, device, epochs: int = 10, learning_rate: float = 0.01, ):
+def protect(model: Module, optim: Optimizer,criterion: Module, train_loader: Iterable, 
+            test_loader: Iterable, device, epochs: int = 10):
     """
     Protects a model with a chosen optimiser against FGSM.
-    Need to have different code for each optimiser (such as special train_loader for mini)
-    """
+    """    
     
-    if chosen_opt == "Adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    elif chosen_opt == "Mini":
-        optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
-    else:
-        return 0
-
     for epoch in range(epochs):
         # Train an epoch
         model.train()
@@ -122,11 +113,11 @@ def protect(model: Module, chosen_opt: StringType,criterion: Module, train_loade
             loss = criterion(prediction, batch_y)
             
             # Compute the gradient
-            optimizer.zero_grad()
+            optim.zero_grad()
             loss.backward()
 
             # Update the parameters of the model with a gradient step
-            optimizer.step()
+            optim.step()
 
         # Test the quality on the test set
         model.eval()

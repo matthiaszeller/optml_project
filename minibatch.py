@@ -61,9 +61,12 @@ def minibatch_run(model: Module, train_dataset: Tensor, test_dataset: Tensor,los
                     metric_fun: Callable, device, bz: int = 16, lr: float = 0.01, epochs: int = 5, dec_lr : bool = False):
     ''' Runs Minibatch SGD with chosen batch size and learning rate for chosen number of epochs'''    
     print("Run Minibatch SGD with batch size {}, learning rate {:.4f} and decreasing ({}) for {} epochs".format(bz, lr, dec_lr, epochs))
+    
+    # The batching is done automatically by the data loaders from Pytorch so the Optimiser just adds the step function
     train_loader, test_loader = build_data_loaders(train_dataset, test_dataset, batch_size=bz)
     minibatch = MiniBatchOptimizer(model.parameters(), lr=lr, decreasing_lr=dec_lr)
     
+    # The training and testing loops are in the training.py file
     losses, acc = training(model, train_loader, minibatch, loss_fun, metric_fun, epochs=epochs, device=device)
     losses, acc = testing(model, test_loader, loss_fun, metric_fun, device=device)
     
@@ -72,6 +75,8 @@ def minibatch_run(model: Module, train_dataset: Tensor, test_dataset: Tensor,los
 
 def minibatch_build(config, model:Module, device, loss_fun: Module, train_dataset: Tensor = None, test_dataset: Tensor = None):
     '''Used by Tuning Function to Test the Minibatch SGD with different Paramters'''  
+    # Bayes Search in Ray Tune samples uniformly from real numbers in a range and not just integers
+    # Thus, since batch sizes are ints and the decreasing lr parameter is a bool we do some formatting here
     b_sz_int = int(config["b_size"])
     dec_lr_int = round(config["dec_lr"])
     dec_lr_bool = True if dec_lr_int else False
@@ -92,6 +97,9 @@ def minibatch_tune(model : Module, train_dataset: Tensor, test_dataset: Tensor, 
     Tunes the Minbatch SGD and returns the best values for learning rate and batch size.
     Pass in datasets to reduce number of downloads
     '''
+    # Tune works by taking a function, a constrain space, an optimiser and a number of runs 
+    # and tries to achieve the highest result possible via Bayes Search
+    # Tune with Parameters allows us to pass values through to the tuner so we do not keep rebuilding the model
     analysis = tune.run(
         tune.with_parameters(minibatch_build, model=model, device=device, loss_fun=criterion, train_dataset=train_dataset, test_dataset=test_dataset), 
         config=space,
@@ -105,6 +113,8 @@ def minibatch_tune(model : Module, train_dataset: Tensor, test_dataset: Tensor, 
     best_acc = 0.0
     clean = ["[", "]"]
 
+    # This loop is fairly quick and makes us of the already exisiting df for export 
+    # to have more control about the sorting of the results
     for index, row in df_analysis.iterrows():    
         base_array = row["mean_accuracy"]
         for char in clean:

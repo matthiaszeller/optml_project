@@ -17,7 +17,7 @@ from training import training, accuracy
 import matplotlib.pyplot as plt
 
 
-## Taken from https://pytorch.org/tutorials/beginner/fgsm_tutorial.html 
+## Taken from the Pytorch tutorial https://pytorch.org/tutorials/beginner/fgsm_tutorial.html 
 # and Lab 10 – Adversarial Robustness(https://colab.research.google.com/drive/1w697nylLw72aFcBEKu7j3yCm6RdpzOi6#scrollTo=eoE7_FDHHkat)
 
 def fgsm(image: Tensor, data_grad: Tensor, update_max_norm: float):

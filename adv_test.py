@@ -16,7 +16,7 @@ examples_lenet = []
 epsilons_lenet = np.arange(0, 0.1, 0.05)
 criterion = torch.nn.CrossEntropyLoss()
 
-epochs = 5
+epochs = 10
 batch_size = 91
 learning_rate = 0.01
 decreasing_lr = False

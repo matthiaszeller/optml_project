@@ -136,6 +136,10 @@ def tune_optimizer(model: Module,
     ids = torch.randperm(xtrain.shape[0])
     split = int(train_ratio * xtrain.shape[0])
 
+    # Add channel if it's not there yet
+    if xtrain.dim() < 4:
+        xtrain = xtrain.clone()[:, None, :]
+
     train_loader = DataLoader(TensorDataset(xtrain[ids[:split]], ytrain[ids[:split]]), batch_size=batch_size)
     test_loader = DataLoader(TensorDataset(xtrain[ids[split:]], ytrain[ids[split:]]), batch_size=batch_size)
 

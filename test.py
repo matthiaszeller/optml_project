@@ -19,21 +19,9 @@ device = torch.device('cuda' if use_cuda and torch.cuda.is_available() else 'cpu
 
 train_dataset, test_dataset = get_mnist(normalize=True)
 
-# Build data loaders
-batch_size = 64
-train_loader, test_loader = build_data_loaders(train_dataset, test_dataset, batch_size)
-
 net = Net().to(device)
 
 opt = AdamOptimizer(net.parameters(), lr=0.0005)
-# losses, accs = training(net,
-#                         train_loader,
-#                         opt,
-#                         CrossEntropyLoss(),
-#                         accuracy,
-#                         epochs=10,
-#                         device=device,
-#                         batch_log_interval=0)
 
 fp = 'adam_tuning.json'
 results = tune_optimizer(
@@ -63,16 +51,3 @@ if Path(fp).exists():
 with open(fp, 'w') as f:
     json.dump(results, f, indent=2)
 
-
-# losses, metrics = training_debug(net,
-#                                  train_loader,
-#                                  opt,
-#                                  CrossEntropyLoss(),
-#                                  accuracy,
-#                                  device=device,
-#                                  n_steps=10)
-
-import matplotlib.pyplot as plt
-#plt.plot(losses)
-plt.show()
-# losses, metrics = testing(net, test_loader, CrossEntropyLoss(), accuracy, device)

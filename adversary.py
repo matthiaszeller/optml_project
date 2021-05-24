@@ -24,7 +24,7 @@ def fgsm(image: Tensor, data_grad: Tensor, update_max_norm: float):
     """
     Compute the FGSM update on an image (or a batch of images)
     """
-    # Collect the element-wise sign of the data gradient
+    # Based on the 
     sign_data_grad = data_grad.sign()
     # Create the perturbed image by adjusting each pixel of the input image
     perturbed_image = image + update_max_norm*sign_data_grad
@@ -47,7 +47,7 @@ def attack(model: Module, criterion: Module, test_loader: Iterable, update_max_n
   adversarial_examples = []  # a small sample of 5 adversarial images
 
   # Loop over all examples in test set in batches
-  for data, target in test_loader:
+  for batch_id, (data, target)in enumerate(test_loader, 1):
     data, target = data.to(device), target.to(device)
 
     # Indicate that we want PyTorch to compute a gradient with respect to the

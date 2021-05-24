@@ -95,7 +95,7 @@ def protect(model: Module, optim: Optimizer,criterion: Module, train_loader: Ite
     for epoch in range(epochs):
         # Train an epoch
         model.train()
-        for batch_x, batch_y in train_loader:
+        for batch_id, (batch_x, batch_y) in enumerate(train_loader, 1):
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
             # Forward pass for adversarial perturbations
@@ -122,13 +122,13 @@ def protect(model: Module, optim: Optimizer,criterion: Module, train_loader: Ite
         # Test the quality on the test set
         model.eval()
         accuracies = []
-        for batch_x, batch_y in test_loader:
+        for batch_id, (batch_x, batch_y) in enumerate(test_loader, 1):
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
 
             # Evaluate the network (forward pass)
             prediction = model(batch_x)
             accuracies.append(accuracy(prediction, batch_y))
         
-        print("Epoch {:.2f} | Test accuracy: {:.5f}".format(epoch, sum(accuracies).item()/len(accuracies)))
+        print("Epoch {:.2f} | Test accuracy: {:.5f}".format(epoch, sum(accuracies)/len(accuracies)))
     
     return model

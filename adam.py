@@ -131,18 +131,3 @@ class AdamOptimizer(Optimizer):
                 #If weight decay exists, update parameters accordingly
                 if wd != 0.0:
                     p.data = p.data - lr * wd * p.data
-
-
-opt = AdamOptimizer(net.parameters())
-losses, metrics = training_debug(net,
-                                 train_loader,
-                                 opt,
-                                 CrossEntropyLoss(),
-                                 accuracy,
-                                 device=device,
-                                 n_steps=100)
-
-import matplotlib.pyplot as plt
-plt.plot(losses)
-plt.show()
-# losses, metrics = testing(net, test_loader, CrossEntropyLoss(), accuracy, device)

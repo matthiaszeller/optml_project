@@ -22,39 +22,39 @@ epochs = 10
 batch_size = 16
 
 # # Tune Hyperparameters
-# net_tune = Net().to(device)
-# mini_opt_tune = MiniBatchOptimizer(net_tune.parameters()) # Just using defaults
+net_tune = Net().to(device)
+mini_opt_tune = MiniBatchOptimizer(net_tune.parameters()) # Just using defaults
 
-# dec_lr_set =  [0]*10 + [1]*10
-# random.shuffle(dec_lr_set)
+dec_lr_set =  [0]*1 + [1]*1
+random.shuffle(dec_lr_set)
 
-# fp = 'mini_tuning.json'
+fp = 'mini_tuning.json'
 
 
-# results = tune_optimizer(
-#     net_tune,
-#     train_dataset.data,
-#     train_dataset.targets,
-#     criterion,
-#     accuracy,
-#     device,
-#     MiniBatchOptimizer,
-#     epochs=10,
-#     search_grid={
-#         'lr': np.linspace(0.00001, 0.1, 20),
-#         'decreasing_lr': dec_lr_set,
-#     }, 
-#     batch_size=16
-# )
+results = tune_optimizer(
+    net_tune,
+    train_dataset.data,
+    train_dataset.targets,
+    criterion,
+    accuracy,
+    device,
+    MiniBatchOptimizer,
+    epochs=10,
+    search_grid={
+        'lr': np.linspace(0.00001, 0.1, 3),
+        'decreasing_lr': dec_lr_set,
+    }, 
+    batch_size=16
+)
 
-# if Path(fp).exists():
-#     with open(fp, 'r') as f:
-#         old_results = json.load(f)
+if Path(fp).exists():
+    with open(fp, 'r') as f:
+        old_results = json.load(f)
 
-#     results = old_results + results
+    results = old_results + results
 
-# with open(fp, 'w') as f:
-#     json.dump(results, f, indent=2)
+with open(fp, 'w') as f:
+    json.dump(results, f, indent=2)
 
 # Train Naive Model
 

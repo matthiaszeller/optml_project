@@ -10,6 +10,7 @@ from data_utils import get_mnist, build_data_loaders
 import json
 from pathlib import Path
 import random
+import pandas as pd
 
 #Get data + Setup
 use_cuda = True # GPU seems to raise erros on my side
@@ -30,6 +31,7 @@ random.shuffle(dec_lr_set)
 
 fp = 'mini_tuning.json'
 
+results = []
 
 results = tune_optimizer(
     net_tune,
@@ -56,11 +58,23 @@ if Path(fp).exists():
 with open(fp, 'w') as f:
     json.dump(results, f, indent=2)
 
+# Select Best Hyperparamters
+with open(fp, 'r') as f:
+        old_results = json.load(f)
+
+df_analysis = pd.DataFrame(results)
+best_acc = 0.0
+clean = ["[", "]"]
+for index, row in df_analysis.iterrows():    
+        trial_acc = row["metric_test"]
+        if trial_acc > best_acc:
+            best_acc = trial_acc
+            learning_rate = round(row["lr"], 6)
+            decreasing_lr = row["decreasing_lr"]
+
+print("Best Accuracy was {}% with Learning Rate {} and Decreasing LR: {}".format(100*best_acc, learning_rate, decreasing_lr))
+
 # Train Naive Model
-
-learning_rate = 0.01
-decreasing_lr = False
-
 accuracy_naive= []
 losses_naive= []
 net_naive = Net().to(device)

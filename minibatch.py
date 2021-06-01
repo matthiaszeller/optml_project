@@ -56,8 +56,8 @@ class MiniBatchOptimizer(Optimizer):
             self.iter = self.iter + 1 # Update iterator
 
 
-
-def minibatch_run(model: Module, train_dataset: Tensor, test_dataset: Tensor,loss_fun: Module,
+# These are deprecated now
+""" def minibatch_run(model: Module, train_dataset: Tensor, test_dataset: Tensor,loss_fun: Module,
                     metric_fun: Callable, device, bz: int = 16, lr: float = 0.01, epochs: int = 5, dec_lr : bool = False):
     ''' Runs Minibatch SGD with chosen batch size and learning rate for chosen number of epochs'''    
     print("Run Minibatch SGD with batch size {}, learning rate {:.4f} and decreasing ({}) for {} epochs".format(bz, lr, dec_lr, epochs))
@@ -120,4 +120,4 @@ def minibatch_tune(model : Module, train_dataset: Tensor, test_dataset: Tensor, 
     configs = analysis.get_all_configs()
     best_config = configs[best_performer]
     
-    return best_config, best_acc
+    return best_config, best_acc """

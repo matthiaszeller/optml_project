@@ -11,7 +11,7 @@ from torch.optim import Optimizer
 from training import accuracy
 
 
-## Source: https://gist.github.com/oscarknagg/45b187c236c6262b1c4bbe2d0920ded6
+## Source: https://adversarial-ml-tutorial.org/adversarial_examples/
 
 def projected_gradient_descent(model, x, y, loss_fn, num_steps, step_size, step_norm, eps, eps_norm,
                                clamp=(0,1), y_target=None):
@@ -69,8 +69,6 @@ def projected_gradient_descent(model, x, y, loss_fn, num_steps, step_size, step_
 
     return x_adv.detach()
 
-
-# Integrate it
 
 def projected_attack(model: Module, loss_fun: Module, test_loader: Iterable, epsilon: float, device, lr: float = 0.01, num_steps: int = 1):
   """

@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import random
 import pandas as pd
+from adversary import projected_attack, projected_protect
 
 #Get data + Setup
 use_cuda = True # GPU seems to raise erros on my side
@@ -33,21 +34,21 @@ fp = 'mini_tuning.json'
 
 results = []
 
-results = tune_optimizer(
-    net_tune,
-    train_dataset.data,
-    train_dataset.targets,
-    criterion,
-    accuracy,
-    device,
-    MiniBatchOptimizer,
-    epochs=10,
-    search_grid={
-        'lr': np.linspace(0.00001, 0.1, 3),
-        'decreasing_lr': dec_lr_set,
-    }, 
-    batch_size=16
-)
+# results = tune_optimizer(
+#     net_tune,
+#     train_dataset.data,
+#     train_dataset.targets,
+#     criterion,
+#     accuracy,
+#     device,
+#     MiniBatchOptimizer,
+#     epochs=10,
+#     search_grid={
+#         'lr': np.linspace(0.00001, 0.1, 3),
+#         'decreasing_lr': dec_lr_set,
+#     }, 
+#     batch_size=16
+# )
 
 if Path(fp).exists():
     with open(fp, 'r') as f:
@@ -77,6 +78,8 @@ print("Best Accuracy was {}% with Learning Rate {} and Decreasing LR: {}".format
 # Train Naive Model
 accuracy_naive= []
 losses_naive= []
+accuracy_naive_proj= []
+losses_naive_proj= []
 net_naive = Net().to(device)
 train_loader, test_loader = build_data_loaders(train_dataset, test_dataset, batch_size)
 
@@ -91,27 +94,47 @@ for eps in epsilons:
     accuracy_naive.append(acc_attack)
     losses_naive.append(loss_attack)
 
+for eps in epsilons:
+    loss_attack, acc_attack  = projected_attack(net_naive, criterion, test_loader, epsilon=eps, device=device, lr=learning_rate)
+    accuracy_naive_proj.append(acc_attack)
+    losses_naive_proj.append(loss_attack)
+
 # Train Robust Model
 robust_net = Net().to(device)
+robust_proj_net = Net().to(device)
 protect_epochs = epochs
 protect_lr = learning_rate
 protect_bz = batch_size
 protect_dec_lr = decreasing_lr
+
 prot_train_loader, prot_test_loader = build_data_loaders(train_dataset, test_dataset, protect_bz)
+
 mini_opt_proc = MiniBatchOptimizer(robust_net.parameters(), lr=protect_lr, decreasing_lr=protect_dec_lr)
+mini_opt_projected = MiniBatchOptimizer(robust_proj_net.parameters(), lr=protect_lr, decreasing_lr=protect_dec_lr)
 
 print("*********************************")
 robust_net = protect(robust_net, mini_opt_proc, criterion, prot_train_loader, prot_test_loader, device=device, epochs=protect_epochs)
+robust_proj_net = projected_protect(robust_proj_net, mini_opt_projected, criterion, prot_train_loader, prot_test_loader, device=device, epochs=protect_epochs, lr=protect_lr)
 print("Success")
 
 # Attack Robust Model
 accuracy_robust = []
 losses_robust = []
+accuracy_robust_proj = []
+losses_robust_proj = []
 
 for eps in epsilons:
-    loss_attack, acc_attack = attack(robust_net, criterion, prot_train_loader, eps, device=device)
+    loss_attack, acc_attack = attack(robust_net, criterion, prot_test_loader, eps, device=device)
     accuracy_robust.append(acc_attack)
     losses_robust.append(loss_attack)
+
+
+for eps in epsilons:
+    loss_attack, acc_attack  = projected_attack(robust_proj_net, criterion, prot_test_loader, epsilon=eps, device=device, lr=learning_rate)
+    accuracy_robust_proj.append(acc_attack)
+    losses_robust_proj.append(loss_attack)
+
+
 
 # Comparing the models
 plt.figure(figsize=(5,5))
@@ -122,6 +145,18 @@ plt.yticks(np.arange(0, 1.1, step=0.1))
 plt.xticks(np.arange(0, 5, step=0.05))
 
 plt.title("Accuracy vs Epsilon")
+plt.xlabel("Epsilon")
+plt.ylabel("Accuracy")
+plt.legend();
+
+plt.figure(figsize=(5,5))
+plt.plot(epsilons, accuracy_naive_proj, "*-", c='blue', label='Naive Model with Projection')
+plt.plot(epsilons, accuracy_robust_proj, "*-", c='orange', label='Robust Model with Projection')
+
+plt.yticks(np.arange(0, 1.1, step=0.1))
+plt.xticks(np.arange(0, 5, step=0.05))
+
+plt.title("Accuracy vs Epsilon with Projection")
 plt.xlabel("Epsilon")
 plt.ylabel("Accuracy")
 plt.legend();

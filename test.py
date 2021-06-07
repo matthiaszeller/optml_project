@@ -21,9 +21,32 @@ train_dataset, test_dataset = get_mnist(normalize=True)
 
 net = Net().to(device)
 
-opt = AdamOptimizer(net.parameters(), lr=0.0005)
-
 fp = 'adam_tuning.json'
+# Want to test those final configs with KFold CV:
+# "0":{
+#     "lr":0.00008,
+#     "beta1":0.9,
+#     "beta2":0.999,
+#     "weight_decay":0.01,
+#     "epsilon":0.00000001,
+#     "batch_size":32.0
+#   },
+# "3": {
+#     "lr": 0.0002,
+#     "beta1": 0.9,
+#     "beta2": 0.999,
+#     "weight_decay": 1.0,
+#     "epsilon": 0.00000001,
+#     "batch_size": 64.0
+# },
+# "5": {
+#     "lr": 0.0002,
+#     "beta1": 0.9,
+#     "beta2": 0.999,
+#     "weight_decay": 0.01,
+#     "epsilon": 0.00000001,
+#     "batch_size": 128.0
+# },
 results = tune_optimizer(
     net,
     train_dataset.data,
@@ -34,12 +57,14 @@ results = tune_optimizer(
     AdamOptimizer,
     epochs=10,
     search_grid={
-        'lr': [0.0001, 0.001, 0.01],
-        'beta1': np.linspace(0.1, 0.9, 3),
-        'beta2': np.linspace(0.5, 0.999, 3),
-        'weight_decay': np.logspace(-4, 0, 3),
-        'epsilon': np.logspace(-10, -8, 3)
-    }
+        'lr': [2e-4], #, 0.001, 0.01],
+        'batch_size': [128],#, 64, 128],
+        'beta1': [0.9],
+        'beta2': [0.999],
+        'weight_decay': [0.01],#, 1e-1, 1.0],
+        'epsilon': [1e-8]
+    },
+    nfolds=5
 )
 
 if Path(fp).exists():

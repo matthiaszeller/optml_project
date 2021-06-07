@@ -4,6 +4,7 @@ from typing import Iterable, Callable, Dict, List
 
 import numpy as np
 import torch
+from sklearn.model_selection import KFold
 from torch.nn import Module
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader, TensorDataset
@@ -131,36 +132,88 @@ def tune_optimizer(model: Module,
                    optim_fun: Callable,
                    epochs: int,
                    search_grid: Dict[str, Iterable],
-                   train_ratio: float = 0.8,
-                   batch_size: int = 64):
-    ids = torch.randperm(xtrain.shape[0])
-    split = int(train_ratio * xtrain.shape[0])
+                   train_ratio: float = None,
+                   nfolds: int = None):
+    """
+    Tune parameters of an optimizer. Evaluate performance either with train/test split, or kfold-CV.
+
+    :param model: a torch module
+    :param xtrain: the training data
+    :param ytrain: the training targets
+    :param loss_fun: loss function
+    :param metric_fun: function to assess model performance
+    :param device: a torch device to train the model on (either cpu or cuda)
+    :param optim_fun: the optimizer class
+    :param epochs: number of epochs
+    :param search_grid: a dict of parameters to vary
+    :param train_ratio: set this if you want train/test splitting instead of KFoldCV
+    :param nfolds: number of folds if you want to use KFoldCV instead of train/test split
+    :return: list of dictionnaries containing training and test results.
+    """
+    def split_data(xtrain, ytrain, batch_size, train_ratio, nfolds):
+        if train_ratio is not None:
+            ids = torch.randperm(xtrain.shape[0])
+            split = int(train_ratio * xtrain.shape[0])
+            train_loader = DataLoader(TensorDataset(xtrain[ids[:split]], ytrain[ids[:split]]), batch_size=batch_size)
+            test_loader = DataLoader(TensorDataset(xtrain[ids[split:]], ytrain[ids[split:]]), batch_size=batch_size)
+            yield train_loader, test_loader
+        else:
+            kf = KFold(n_splits=nfolds, shuffle=True)
+            for train_index, test_index in kf.split(xtrain):
+                train_loader = DataLoader(TensorDataset(xtrain[train_index], ytrain[train_index]), batch_size=batch_size)
+                test_loader = DataLoader(TensorDataset(xtrain[test_index], ytrain[test_index]), batch_size=batch_size)
+                yield train_loader, test_loader
+
+    if train_ratio is None and nfolds is None:
+        raise ValueError('you must specify either train_ratio or nfolds for performance evaluation')
+    elif train_ratio is not None and nfolds is not None:
+        raise ValueError('you must specify either train_ratio xor nfolds for performance evaluation')
 
     # Add channel if it's not there yet
     if xtrain.dim() < 4:
         xtrain = xtrain.clone()[:, None, :]
 
-    train_loader = DataLoader(TensorDataset(xtrain[ids[:split]], ytrain[ids[:split]]), batch_size=batch_size)
-    test_loader = DataLoader(TensorDataset(xtrain[ids[split:]], ytrain[ids[split:]]), batch_size=batch_size)
-
-    # Iterate over all parameters
-    params, values = list(zip(*search_grid.items()))
-    init_state = model.state_dict().copy()
     results = []
+    params, values = list(zip(*search_grid.items()))
+    print('Launching hyperparameter tuning:')
+    for p, v in zip(params, values):
+        print(f'\t{p} = {v}')
+    # Copy the state of the un-trained model
+    init_state = model.state_dict().copy()
+    # Iterate over all parameters via cartesian product using itertools.product
     for p in itertools.product(*values):
+        # Initialize tuning parameters
         optim_params = dict(zip(params, p))
+        batch_size = optim_params['batch_size']
         print(optim_params)
-        optim = optim_fun(model.parameters(), **optim_params)
-        model.load_state_dict(init_state)
-        losses_train, metrics_train = training(model, train_loader, optim, loss_fun,
-                                               metric_fun, epochs, device, batch_log_interval=0)
-        losses_test, metrics_test = testing(model, test_loader, loss_fun, metric_fun, device)
+        del optim_params['batch_size']
+        # Training / test loop
+        losses_train, metrics_train, losses_test, metrics_test = [], [], [], []
+        for train_loader, test_loader in split_data(xtrain, ytrain, batch_size, train_ratio, nfolds):
+            # Reset model
+            model.load_state_dict(init_state)
+            # Instantiate optimizer
+            optim = optim_fun(model.parameters(), **optim_params)
+            # Train
+            losse_train, metric_train = training(model, train_loader, optim, loss_fun,
+                                                 metric_fun, epochs, device, batch_log_interval=0)
+            # Test
+            losse_test, metric_test = testing(model, test_loader, loss_fun, metric_fun, device)
+            # Log results of the current fold
+            losses_train.append(np.array(losse_train).mean(axis=1).tolist())
+            metrics_train.append(np.array(metric_train).mean(axis=1).tolist())
+            losses_test.append(np.array(losse_test).mean())
+            metrics_test.append(np.array(metric_test).mean())
+
+        # Log results for the current params
         res = {
-            'loss_train': np.array(losses_train).mean(axis=1).tolist(),
-            'metric_train': np.array(metrics_train).mean(axis=1).tolist(),
-            'loss_test': np.array(losses_test).mean(),
-            'metric_test': np.array(metrics_test).mean()
+            'loss_train': losses_train,
+            'metric_train': metrics_train,
+            'loss_test': losses_test,
+            'metric_test': metrics_test
         }
+        # Log the optimizer parameters
+        optim_params['batch_size'] = batch_size
         res.update(optim_params)
         results.append(res)
 

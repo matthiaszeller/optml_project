@@ -107,8 +107,8 @@ class AdamOptimizer(Optimizer):
 
                 if len(self.state[p]) == 0:
                     self.state[p]['step'] = 0
-                    self.state[p]['moment1'] = torch.zeros(p.data.size())
-                    self.state[p]['moment2'] = torch.zeros(p.data.size())
+                    self.state[p]['moment1'] = torch.zeros_like(p.data)
+                    self.state[p]['moment2'] = torch.zeros_like(p.data)
 
     def step(self, closure: Optional[Callable[[], float]] = ...) -> Optional[float]:
         # State stores the variables used by optimization algo

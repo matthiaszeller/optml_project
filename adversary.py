@@ -1,13 +1,14 @@
 
 
 from time import time
-from typing import Iterable
+from typing import Iterable, Callable
 
 import torch
 from torch.functional import Tensor
 from torch.nn import Module
 from torch.optim import Optimizer
 
+# TODO remove
 from training import accuracy
 
 
@@ -178,7 +179,8 @@ def fgsm(image: Tensor, grad_torch: Tensor, epsilon: float):
     return adverserial_image
 
 
-def attack(model: Module, loss_fun: Module, test_loader: Iterable, epsilon: float, device):
+def attack(model: Module, loss_fun: Module, metric_fun: Callable, test_loader: Iterable, epsilon: float, device):
+    # TODO add accuracy (and remove import)
     """
     Attack a trained neural net
     """
@@ -203,7 +205,7 @@ def attack(model: Module, loss_fun: Module, test_loader: Iterable, epsilon: floa
 
         # Re-classify the perturbed batch
         yhat_adv = model(x_adverserial)
-        adversarial_accuracy = accuracy(yhat_adv, y)
+        adversarial_accuracy = metric_fun(yhat_adv, y)
 
         metrics.append(adversarial_accuracy)
         losses.append(loss.item())
@@ -216,7 +218,7 @@ def attack(model: Module, loss_fun: Module, test_loader: Iterable, epsilon: floa
     return losses, average_accuracy
 
 
-def protect(model: Module, optim: Optimizer, loss_fun: Module, train_loader: Iterable,
+def protect(model: Module, optim: Optimizer, loss_fun: Module, metric_fun: Callable, train_loader: Iterable,
             test_loader: Iterable, device, epochs: int = 10, epsilon: float = 0.25):
     """
     Protects a model with a chosen optimiser against FGSM.
@@ -252,12 +254,13 @@ def protect(model: Module, optim: Optimizer, loss_fun: Module, train_loader: Ite
         # Test the quality on the test set
         model.eval()
         metrics = []
-        for _, (x, y) in enumerate(test_loader, 1):
-            x, y = x.to(device), y.to(device)
+        with torch.no_grad():
+            for _, (x, y) in enumerate(test_loader, 1):
+                x, y = x.to(device), y.to(device)
 
-            # Evaluate the network (forward pass)
-            yhat_adv = model(x)
-            metrics.append(accuracy(yhat_adv, y))
+                # Evaluate the network (forward pass)
+                yhat_adv = model(x)
+                metrics.append(metric_fun(yhat_adv, y))
 
         print("Epoch {:.2f} | Test accuracy: {:.5f}".format(epoch, sum(metrics) / len(metrics)))
     t = time() - t

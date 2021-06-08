@@ -56,6 +56,9 @@ class NesterovOptimizer(Optimizer):
                 pstate = self.state[p]
                 pstate['y'] = p.data.clone()
 
+    def __repr__(self):
+        return 'NesterovOptimizer'
+
 
 class AdamOptimizer(Optimizer):
 
@@ -165,6 +168,9 @@ class AdamOptimizer(Optimizer):
                 if wd != 0.0:
                     p.data = p.data - lr * wd * p.data
 
+    def __repr__(self):
+        return 'AdamOptimizer'
+
 
 class MiniBatchOptimizer(Optimizer):
     def __init__(self, params, lr: float = 1e-2, decreasing_lr: bool = False) -> None:
@@ -204,3 +210,7 @@ class MiniBatchOptimizer(Optimizer):
                 p.data = p.data - lr * grad
 
             self.iter = self.iter + 1  # Update iterator
+
+    def __repr__(self):
+        return 'MiniBatchOptimizer'
+

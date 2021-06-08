@@ -252,12 +252,13 @@ def protect(model: Module, optim: Optimizer, loss_fun: Module, train_loader: Ite
         # Test the quality on the test set
         model.eval()
         metrics = []
-        for _, (x, y) in enumerate(test_loader, 1):
-            x, y = x.to(device), y.to(device)
+        with torch.no_grad():
+            for _, (x, y) in enumerate(test_loader, 1):
+                x, y = x.to(device), y.to(device)
 
-            # Evaluate the network (forward pass)
-            yhat_adv = model(x)
-            metrics.append(accuracy(yhat_adv, y))
+                # Evaluate the network (forward pass)
+                yhat_adv = model(x)
+                metrics.append(accuracy(yhat_adv, y))
 
         print("Epoch {:.2f} | Test accuracy: {:.5f}".format(epoch, sum(metrics) / len(metrics)))
     t = time() - t

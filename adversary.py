@@ -200,3 +200,54 @@ def protected_training(model: Module, dataset: Iterable, optim: Optimizer, loss_
         return losses_epoch
     return losses_epoch, metrics_epoch
 
+
+def protected_training_alt(model: Module, dataset: Iterable, optim: Optimizer, loss_fun: Module, metric_fun: Callable = None,
+            epochs: int = 10, device=None, batch_log_interval: int = 100):
+    """
+    Protects a model with a chosen optimiser against FGSM.
+    """
+    losses_epoch = []
+    metrics_epoch = []
+    epsilon= 0.25 #Constant for now
+    t = time()
+
+    for epoch in range(epochs):
+        losses = []
+        metrics = []
+        model.train()  # Train an epoch
+        for _, (x, y) in enumerate(dataset, 1):
+            x, y = x.to(device), y.to(device)
+
+            # Forward pass for adversarial perturbations
+            x.requires_grad = True
+            yhat = model(x)
+
+            loss = loss_fun(yhat, y)
+            model.zero_grad()
+            loss.backward()
+            x_adverserial = x+fgsm_alt(model=model, loss_fun=loss_fun, x=x, y=y, epsilon=epsilon)
+
+            # Evaluate the network (forward pass)
+            yhat_adv = model(x_adverserial)
+            loss = loss_fun(yhat_adv, y)
+            metric = metric_fun(yhat, y)
+            # Compute the gradient
+            optim.zero_grad()
+            loss.backward()
+
+            # Update the parameters of the model with a gradient step
+            # Due to how we specified our Optimizers, this is generic
+            optim.step()
+
+            metrics.append(metric)
+            losses.append(loss.item())
+
+        losses_epoch.append(losses)
+        metrics_epoch.append(metrics)
+        print_metric = '' if metric_fun is None else f'\tavg epoch acc = {np.mean(metrics):.4}'
+        print(f'Epoch {epoch}\tavg epoch Loss = {np.mean(losses):.4}{print_metric}')
+    t = time() - t
+    print(f'training took {t:.4} s')
+    if metric_fun is None:
+        return losses_epoch
+    return losses_epoch, metrics_epoch

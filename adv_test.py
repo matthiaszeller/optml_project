@@ -1,10 +1,10 @@
-from adversary import attack, protect
+from adversary import attack, protected_training
 from net import Net
 import numpy as np
 from torch.optim import Optimizer
 import torch
 from training import training, testing, accuracy, tune_optimizer
-from minibatch import MiniBatchOptimizer
+from optimizer import MiniBatchOptimizer
 import matplotlib.pyplot as plt
 from data_utils import get_mnist, build_data_loaders
 import json
@@ -30,7 +30,7 @@ mini_opt_tune = MiniBatchOptimizer(net_tune.parameters()) # Just using defaults
 dec_lr_set =  [0]*1 + [1]*1
 random.shuffle(dec_lr_set)
 
-fp = 'mini_tuning.json'
+fp = 'res/minibatch_tuning_round2.json'
 
 results = []
 
@@ -63,17 +63,18 @@ with open(fp, 'w') as f:
 with open(fp, 'r') as f:
         old_results = json.load(f)
 
-df_analysis = pd.DataFrame(results)
-best_acc = 0.0
-clean = ["[", "]"]
-for index, row in df_analysis.iterrows():    
-        trial_acc = row["metric_test"]
-        if trial_acc > best_acc:
-            best_acc = trial_acc
-            learning_rate = round(row["lr"], 6)
-            decreasing_lr = row["decreasing_lr"]
-
-print("Best Accuracy was {}% with Learning Rate {} and Decreasing LR: {}".format(100*best_acc, learning_rate, decreasing_lr))
+# df_analysis = pd.DataFrame(results)
+# best_acc = 0.0
+# clean = ["[", "]"]
+# for index, row in df_analysis.iterrows():    
+#         trial_acc = row["metric_test"]
+#         if trial_acc > best_acc:
+#             best_acc = trial_acc
+#             learning_rate = round(row["lr"], 6)
+#             decreasing_lr = row["decreasing_lr"]
+learning_rate = 0.001
+decreasing_lr = False
+#print("Best Accuracy was {}% with Learning Rate {} and Decreasing LR: {}".format(100*best_acc, learning_rate, decreasing_lr))
 
 # Train Naive Model
 accuracy_naive= []
@@ -90,14 +91,14 @@ loss_test, acc_test = testing(net_naive, test_loader, criterion, accuracy, devic
 
 # Attack Naive Model
 for eps in epsilons:
-    loss_attack, acc_attack  = attack(net_naive, criterion, test_loader, epsilon=eps, device=device)
+    loss_attack, acc_attack  = attack(net_naive, criterion, accuracy, test_loader, epsilon=eps, device=device)
     accuracy_naive.append(acc_attack)
     losses_naive.append(loss_attack)
 
-for eps in epsilons:
-    loss_attack, acc_attack  = projected_attack(net_naive, criterion, test_loader, epsilon=eps, device=device, lr=learning_rate)
-    accuracy_naive_proj.append(acc_attack)
-    losses_naive_proj.append(loss_attack)
+# for eps in epsilons:
+#     loss_attack, acc_attack  = projected_attack(net_naive, criterion, test_loader, epsilon=eps, device=device, lr=learning_rate)
+#     accuracy_naive_proj.append(acc_attack)
+#     losses_naive_proj.append(loss_attack)
 
 # Train Robust Model
 robust_net = Net().to(device)
@@ -110,11 +111,12 @@ protect_dec_lr = decreasing_lr
 prot_train_loader, prot_test_loader = build_data_loaders(train_dataset, test_dataset, protect_bz)
 
 mini_opt_proc = MiniBatchOptimizer(robust_net.parameters(), lr=protect_lr, decreasing_lr=protect_dec_lr)
-mini_opt_projected = MiniBatchOptimizer(robust_proj_net.parameters(), lr=protect_lr, decreasing_lr=protect_dec_lr)
+#mini_opt_projected = MiniBatchOptimizer(robust_proj_net.parameters(), lr=protect_lr, decreasing_lr=protect_dec_lr)
 
 print("*********************************")
-robust_net = protect(robust_net, mini_opt_proc, criterion, prot_train_loader, prot_test_loader, device=device, epochs=protect_epochs)
-robust_proj_net = projected_protect(robust_proj_net, mini_opt_projected, criterion, prot_train_loader, prot_test_loader, device=device, epochs=protect_epochs, lr=protect_lr)
+loss_train, acc_train = protected_training(robust_net, prot_train_loader, mini_opt_proc, criterion, accuracy, epochs=protect_epochs, device=device, epsilon=0.25)
+loss_test, acc_test = testing(robust_net, test_loader, criterion, accuracy, device=device)
+#robust_proj_net = projected_protect(robust_proj_net, mini_opt_projected, criterion, prot_train_loader, prot_test_loader, device=device, epochs=protect_epochs, lr=protect_lr)
 print("Success")
 
 # Attack Robust Model
@@ -124,13 +126,13 @@ accuracy_robust_proj = []
 losses_robust_proj = []
 
 for eps in epsilons:
-    loss_attack, acc_attack = attack(robust_net, criterion, prot_test_loader, eps, device=device)
+    loss_attack, acc_attack = attack(robust_net, criterion, accuracy, prot_test_loader, eps, device=device)
     accuracy_robust.append(acc_attack)
     losses_robust.append(loss_attack)
 
 
 for eps in epsilons:
-    loss_attack, acc_attack  = projected_attack(robust_proj_net, criterion, prot_test_loader, epsilon=eps, device=device, lr=learning_rate)
+    loss_attack, acc_attack  = projected_attack(robust_proj_net, criterion, accuracy, prot_test_loader, epsilon=eps, device=device, lr=learning_rate)
     accuracy_robust_proj.append(acc_attack)
     losses_robust_proj.append(loss_attack)
 

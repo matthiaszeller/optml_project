@@ -1,8 +1,6 @@
-
-
 from time import time
 from typing import Iterable, Callable
-
+import numpy as np
 import torch
 from torch.functional import Tensor
 from torch.nn import Module
@@ -218,16 +216,20 @@ def attack(model: Module, loss_fun: Module, metric_fun: Callable, test_loader: I
     return losses, average_accuracy
 
 
-def protect(model: Module, optim: Optimizer, loss_fun: Module, metric_fun: Callable, train_loader: Iterable,
-            test_loader: Iterable, device, epochs: int = 10, epsilon: float = 0.25):
+def protected_training(model: Module, dataset: Iterable, optim: Optimizer, loss_fun: Module, metric_fun: Callable = None,
+            epochs: int = 10, device=None, epsilon: float = 0.25):
     """
     Protects a model with a chosen optimiser against FGSM.
     """
+    losses_epoch = []
+    metrics_epoch = []
     t = time()
-    for epoch in range(epochs):
 
+    for epoch in range(epochs):
+        losses = []
+        metrics = []
         model.train()  # Train an epoch
-        for _, (x, y) in enumerate(train_loader, 1):
+        for _, (x, y) in enumerate(dataset, 1):
             x, y = x.to(device), y.to(device)
 
             # Forward pass for adversarial perturbations
@@ -242,7 +244,7 @@ def protect(model: Module, optim: Optimizer, loss_fun: Module, metric_fun: Calla
             # Evaluate the network (forward pass)
             yhat_adv = model(x_adverserial)
             loss = loss_fun(yhat_adv, y)
-
+            metric = metric_fun(yhat, y)
             # Compute the gradient
             optim.zero_grad()
             loss.backward()
@@ -251,18 +253,17 @@ def protect(model: Module, optim: Optimizer, loss_fun: Module, metric_fun: Calla
             # Due to how we specified our Optimizers, this is generic
             optim.step()
 
-        # Test the quality on the test set
-        model.eval()
-        metrics = []
-        with torch.no_grad():
-            for _, (x, y) in enumerate(test_loader, 1):
-                x, y = x.to(device), y.to(device)
+            metrics.append(metric)
+            losses.append(loss.item())
 
-                # Evaluate the network (forward pass)
-                yhat_adv = model(x)
-                metrics.append(metric_fun(yhat_adv, y))
-
-        print("Epoch {:.2f} | Test accuracy: {:.5f}".format(epoch, sum(metrics) / len(metrics)))
+        losses_epoch.append(losses)
+        metrics_epoch.append(metrics)
+        print_metric = '' if metric_fun is None else f'\tavg epoch acc = {np.mean(metrics):.4}'
+        print(f'Epoch {epoch}\tavg epoch Loss = {np.mean(losses):.4}{print_metric}')
+        print("Epoch {:.2f} | Training Metric: {:.5f}".format(epoch, sum(metrics) / len(metrics)))
     t = time() - t
     print(f'training took {t:.4} s')
-    return model
+    if metric_fun is None:
+        return losses_epoch
+    return losses_epoch, metrics_epoch
+

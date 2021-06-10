@@ -15,7 +15,8 @@ from training import accuracy
 def fgsm_alt(model, loss_fun, x, y, epsilon):
     """ Construct FGSM adversarial examples on the examples X"""
     delta = torch.zeros_like(x, requires_grad=True)
-    loss = loss_fun((model(x + delta), y))
+    y_hat = model(x + delta)
+    loss = loss_fun(y_hat, y)
     loss.backward()
     return epsilon * delta.grad.detach().sign()
 
@@ -31,7 +32,7 @@ def fgsm_attack(model: Module, loss_fun: Module, metric_fun: Callable, test_load
         x, y = x.to(device), y.to(device)
 
         # Generate an adverserial version of the test data
-        x_adverserial = x+fgsm_alt(model, x, y, epsilon)
+        x_adverserial = x+fgsm_alt(model=model, loss_fun=loss_fun, x=x, y=y, epsilon=epsilon)
 
         # Re-classify the perturbed batch
         yhat_adv = model(x_adverserial)
@@ -60,7 +61,7 @@ def projected_gd(model, loss_fun, x, y, epsilon, alpha, num_iter):
         delta.grad.zero_()
     return delta.detach()
 
-def projected_attack(model: Module, loss_fun: Module, metric_fun: Callable, test_loader: Iterable, epsilon=0.1, alpha=1e-2, num_iter=40, device):
+def projected_attack(model: Module, loss_fun: Module, metric_fun: Callable, test_loader: Iterable, epsilon:float, alpha:float, num_iter:int, device):
     # TODO add accuracy (and remove import)
     """
     Attack a trained neural net with projected GD
@@ -72,7 +73,7 @@ def projected_attack(model: Module, loss_fun: Module, metric_fun: Callable, test
         x, y = x.to(device), y.to(device)
 
         # Generate an adverserial version of the test data
-        x_adverserial = x+projected_gd(model, x, y, epsilon, alpha, num_iter)
+        x_adverserial = x+projected_gd(model, loss_fun, x, y, epsilon, alpha, num_iter)
 
         # Re-classify the perturbed batch
         yhat_adv = model(x_adverserial)
@@ -149,12 +150,13 @@ def attack(model: Module, loss_fun: Module, metric_fun: Callable, test_loader: I
 
 
 def protected_training(model: Module, dataset: Iterable, optim: Optimizer, loss_fun: Module, metric_fun: Callable = None,
-            epochs: int = 10, device=None, epsilon: float = 0.25):
+            epochs: int = 10, device=None, batch_log_interval: int = 100):
     """
     Protects a model with a chosen optimiser against FGSM.
     """
     losses_epoch = []
     metrics_epoch = []
+    epsilon= 0.25 #Constant for now
     t = time()
 
     for epoch in range(epochs):

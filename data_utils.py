@@ -81,7 +81,7 @@ def get_best_hyperparams(fp, epsilon = 1e-8):
     else:
         raise ValueError("File path does not exist!")
 
-    best_res = {'metric_train': 0.0, 'metric_test' : 0.0}
+    best_res = {'metric_train': (0.0,0.0), 'metric_test' : 0.0}
     final_res = dict()
     if 'adam' in fp:
         mean = [np.mean(results['metric_train']['0']), np.mean(results['metric_train']['1']), np.mean(results['metric_train']['2'])]
@@ -91,8 +91,8 @@ def get_best_hyperparams(fp, epsilon = 1e-8):
         std_test = [np.std(results['metric_test']['0'])+ epsilon, np.std(results['metric_test']['1'])+ epsilon, np.std(results['metric_test']['2'])+ epsilon]
  
         for i in range(1,3):
-            if (mean[i] / std[i]) > best_res['metric_train'] and (mean_test[i]/std_test[i]) > best_res['metric_test']:
-                best_res['metric_train'] = (mean[i] / std[i])
+            if (mean_test[i]/std_test[i]) > best_res['metric_test']:
+                best_res['metric_train'] = (mean[i],  std[i])
                 best_res['metric_test'] = (mean_test[i]/std_test[i]) 
                 for key, val in results.items():
                     if str(i) in val.keys():
@@ -109,9 +109,9 @@ def get_best_hyperparams(fp, epsilon = 1e-8):
             mean_test =  np.mean(results[i]['metric_test'])
             std_test =  np.std(mean_test) + epsilon
            
-            if (mean_train_final/std_train) > best_res['metric_train'] and (mean_test/std_test) > best_res['metric_test']:
+            if (mean_test/std_test) > best_res['metric_test']:
 
-                best_res['metric_train'] = (mean_train_final/std_train)
+                best_res['metric_train'] = (mean_train_final,std_train)
                 best_res['metric_test'] = (mean_test/std_test)
                 for key, val in results[i].items():
                     final_res[key] = val

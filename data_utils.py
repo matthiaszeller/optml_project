@@ -3,6 +3,7 @@ from typing import Tuple
 import json
 
 import numpy as np
+import pandas as pd
 import torch
 import torchvision
 from torch.utils.data import DataLoader, TensorDataset
@@ -73,52 +74,40 @@ def get_height_weight_gender(sub_sample=True, add_outlier=False):
 
     return height, weight, gender
 
-def get_best_hyperparams(fp, epsilon = 1e-8):
+def load_results(fp:str, drop_cst_param: bool = True):
+    """Returns a DataFrame from the tuning results and the columns of the DataFrame corresponding to hyperparameters."""
+
+    with open(fp, 'r') as f:
+        res = json.load(f)
+        
+    df = pd.DataFrame(res)
+    hyperparams = df.columns.drop(['loss_train', 'metric_train', 'loss_test', 'metric_test'])
+    # Average over folds
+    df.loss_train = df.loss_train.apply(lambda e: np.array(e).mean(axis=0))
+    df.metric_train = df.metric_train.apply(lambda e: np.array(e).mean(axis=0))
+    df.loss_test = df.loss_test.apply(np.mean)
+    df['metric_test_std'] = df.metric_test.apply(np.std)
+    df.metric_test = df.metric_test.apply(np.mean)
+    
+    if drop_cst_param:
+        hyperparams = hyperparams.drop([e for e in hyperparams if df[e].nunique() <= 1])
+    
+    return df, hyperparams
+
+def get_best_hyperparams(fp:str):
     """Get best set of hyperparameters for any optimizer."""
-    if Path(fp).exists():
-        with open(fp, 'r') as f:
-            results = json.load(f)
+    if 'nesterov' not in fp:
+        df, params = load_results(fp, drop_cst_param=False)
     else:
-        raise ValueError("File path does not exist!")
+        df, params = load_results(fp)
 
-    best_res = {'metric_train': (0.0,0.0), 'metric_test' : 0.0}
-    final_res = dict()
-    if 'adam' in fp:
-        mean = [np.mean(results['metric_train']['0']), np.mean(results['metric_train']['1']), np.mean(results['metric_train']['2'])]
-        std = [np.std(np.mean(results['metric_train']['0'],axis=0))+ epsilon, np.std(np.mean(results['metric_train']['1'],axis=0))+ epsilon, np.std(np.mean(results['metric_train']['2'],axis=0))+ epsilon]
+    best_res = {'metric_test' : -float('inf')}
+    ind = 0
+    for idx, row in df.iterrows():
+        if (row.metric_test/ row['metric_test_std']) > best_res['metric_test']:
+            best_res['metric_test'] = row.metric_test/ row['metric_test_std']
+            ind = int(idx)              
 
-        mean_test = [np.std(results['metric_test']['0']), np.std(results['metric_test']['1']), np.std(results['metric_test']['2'])]
-        std_test = [np.std(results['metric_test']['0'])+ epsilon, np.std(results['metric_test']['1'])+ epsilon, np.std(results['metric_test']['2'])+ epsilon]
- 
-        for i in range(1,3):
-            if (mean_test[i]/std_test[i]) > best_res['metric_test']:
-                best_res['metric_train'] = (mean[i],  std[i])
-                best_res['metric_test'] = (mean_test[i]/std_test[i]) 
-                for key, val in results.items():
-                    if str(i) in val.keys():
-                        final_res[key] = val[str(i)]
-                    
-
-    else:
-        for i in range(len(results)):
-            mean_train =  np.mean(results[i]['metric_train'], axis=1)
-            mean_train_final = np.mean(mean_train)
-            std_train=  np.std(mean_train) + epsilon
-
-            
-            mean_test =  np.mean(results[i]['metric_test'])
-            std_test =  np.std(mean_test) + epsilon
-           
-            if (mean_test/std_test) > best_res['metric_test']:
-
-                best_res['metric_train'] = (mean_train_final,std_train)
-                best_res['metric_test'] = (mean_test/std_test)
-                for key, val in results[i].items():
-                    final_res[key] = val
-                        
-                    
-
-    return final_res
-
+    return df.iloc[ind][params].to_dict()
 
 

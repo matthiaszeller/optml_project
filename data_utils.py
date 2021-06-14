@@ -101,11 +101,12 @@ def get_best_hyperparams(fp:str):
     else:
         df, params = load_results(fp)
 
-    best_res = {'metric_test' : -float('inf')}
     ind = 0
+    epsilon = 1e-8
+    best_res = {'metric_test' : -float('inf')}
     for idx, row in df.iterrows():
-        if (row.metric_test/ row['metric_test_std']) > best_res['metric_test']:
-            best_res['metric_test'] = row.metric_test/ row['metric_test_std']
+        if (row.metric_test/ (row['metric_test_std'] + epsilon)) > best_res['metric_test']:
+            best_res['metric_test'] = row.metric_test/ (row['metric_test_std'] + epsilon)
             ind = int(idx)              
 
     return df.iloc[ind][params].to_dict()

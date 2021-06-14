@@ -11,45 +11,11 @@ from training import accuracy
 
 
 ## Source: https://adversarial-ml-tutorial.org/adversarial_examples/
+def norms(Z):
+    """Compute norms over all but the first dimension"""
+    # Taken from the Source. This function is used to project to the l-2 ball
+    return Z.view(Z.shape[0], -1).norm(dim=1)[:,None,None,None]
 
-def fgsm_alt(model, loss_fun, x, y, epsilon):
-    """ Construct FGSM adversarial examples on the examples X"""
-    delta = torch.zeros_like(x, requires_grad=True)
-    y_hat = model(x + delta)
-    loss = loss_fun(y_hat, y)
-    loss.backward()
-    return epsilon * delta.grad.detach().sign()
-
-def fgsm_attack(model: Module, loss_fun: Module, metric_fun: Callable, test_loader: Iterable, epsilon: float, device):
-    # TODO add accuracy (and remove import)
-    """
-    Attack a trained neural net with alternate FGSM
-    """
-    metrics = []
-    losses = []
-    # Loop over test set with our dataloaders
-    for x, y in test_loader:
-        x, y = x.to(device), y.to(device)
-
-        # Generate an adverserial version of the test data
-        x_adverserial = x+fgsm_alt(model=model, loss_fun=loss_fun, x=x, y=y, epsilon=epsilon)
-
-        # Re-classify the perturbed batch
-        yhat_adv = model(x_adverserial)
-
-        adversarial_accuracy = metric_fun(yhat_adv, y)
-        loss = loss_fun(yhat_adv, y)
-        
-        metrics.append(adversarial_accuracy)
-        losses.append(loss.item())
-    # Assuming unchanged Batch
-    average_accuracy = sum(metrics) / len(metrics)
-
-    print("Epsilon: {:.2f}\tTest Accuracy = {:.3f}".format(epsilon, average_accuracy))
-
-    return losses, average_accuracy
-
-# acc, ex = fgsm_attack(robust_net, criterion, accuracy, prot_test_loader, eps, device=device)
 
 def projected_gd(model, loss_fun, x, y, epsilon, alpha, num_iter):
     """ Construct FGSM adversarial examples on the examples X"""
@@ -57,9 +23,16 @@ def projected_gd(model, loss_fun, x, y, epsilon, alpha, num_iter):
     for t in range(num_iter):
         loss = loss_fun(model(x + delta), y)
         loss.backward()
-        delta.data = (delta + alpha*delta.grad.detach().sign()).clamp(-epsilon,epsilon)
+        delta.data += alpha*delta.grad.detach() / norms(delta.grad.detach())
+        delta.data = torch.min(torch.max(delta.detach(), -x), 1-x) # clip X+delta to [0,1]
+        delta.data *= epsilon / norms(delta.detach()).clamp(min=epsilon)
         delta.grad.zero_()
-    return delta.detach()
+    
+    adverserial_image = x+ delta.detach()
+    adverserial_image = torch.clamp(adverserial_image, 0, 1)
+    # Sent back an adverserial image
+    return adverserial_image
+
 
 def projected_attack(model: Module, loss_fun: Module, metric_fun: Callable, test_loader: Iterable, epsilon:float, alpha:float, num_iter:int, device):
     # TODO add accuracy (and remove import)
@@ -73,7 +46,7 @@ def projected_attack(model: Module, loss_fun: Module, metric_fun: Callable, test
         x, y = x.to(device), y.to(device)
 
         # Generate an adverserial version of the test data
-        x_adverserial = x+projected_gd(model, loss_fun, x, y, epsilon, alpha, num_iter)
+        x_adverserial = projected_gd(model, loss_fun, x, y, epsilon, alpha, num_iter)
 
         # Re-classify the perturbed batch
         yhat_adv = model(x_adverserial)
@@ -89,9 +62,6 @@ def projected_attack(model: Module, loss_fun: Module, metric_fun: Callable, test
     print("Epsilon: {:.2f}\tTest Accuracy = {:.3f}".format(epsilon, average_accuracy))
 
     return losses, average_accuracy
-
-#print("Net Naive with PGD:", projected_attack(robust_net, criterion, accuracy, prot_test_loader, eps, alpha, num_iter device=device)
-
 
 ## Taken from https://pytorch.org/tutorials/beginner/fgsm_tutorial.html 
 # and Lab 10 – Adversarial Robustness(https://colab.research.google.com/drive/1w697nylLw72aFcBEKu7j3yCm6RdpzOi6#scrollTo=eoE7_FDHHkat)
@@ -174,58 +144,6 @@ def protected_training(model: Module, dataset: Iterable, optim: Optimizer, loss_
             model.zero_grad()
             loss.backward()
             x_adverserial = fgsm(x, x.grad, epsilon)
-
-            # Evaluate the network (forward pass)
-            yhat_adv = model(x_adverserial)
-            loss = loss_fun(yhat_adv, y)
-            metric = metric_fun(yhat, y)
-            # Compute the gradient
-            optim.zero_grad()
-            loss.backward()
-
-            # Update the parameters of the model with a gradient step
-            # Due to how we specified our Optimizers, this is generic
-            optim.step()
-
-            metrics.append(metric)
-            losses.append(loss.item())
-
-        losses_epoch.append(losses)
-        metrics_epoch.append(metrics)
-        print_metric = '' if metric_fun is None else f'\tavg epoch acc = {np.mean(metrics):.4}'
-        print(f'Epoch {epoch}\tavg epoch Loss = {np.mean(losses):.4}{print_metric}')
-    t = time() - t
-    print(f'training took {t:.4} s')
-    if metric_fun is None:
-        return losses_epoch
-    return losses_epoch, metrics_epoch
-
-
-def protected_training_alt(model: Module, dataset: Iterable, optim: Optimizer, loss_fun: Module, metric_fun: Callable = None,
-            epochs: int = 10, device=None, batch_log_interval: int = 100):
-    """
-    Protects a model with a chosen optimiser against FGSM.
-    """
-    losses_epoch = []
-    metrics_epoch = []
-    epsilon= 0.25 #Constant for now
-    t = time()
-
-    for epoch in range(epochs):
-        losses = []
-        metrics = []
-        model.train()  # Train an epoch
-        for _, (x, y) in enumerate(dataset, 1):
-            x, y = x.to(device), y.to(device)
-
-            # Forward pass for adversarial perturbations
-            x.requires_grad = True
-            yhat = model(x)
-
-            loss = loss_fun(yhat, y)
-            model.zero_grad()
-            loss.backward()
-            x_adverserial = x+fgsm_alt(model=model, loss_fun=loss_fun, x=x, y=y, epsilon=epsilon)
 
             # Evaluate the network (forward pass)
             yhat_adv = model(x_adverserial)

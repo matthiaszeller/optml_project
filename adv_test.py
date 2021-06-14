@@ -4,7 +4,7 @@ import numpy as np
 from torch.optim import Optimizer
 import torch
 from training import training, testing, accuracy
-from minibatch import MiniBatchOptimizer
+from optimizer import MiniBatchOptimizer
 import matplotlib.pyplot as plt
 from data_utils import get_mnist, build_data_loaders
 
@@ -15,8 +15,28 @@ accuracies_lenet_alt= []
 accuracies_lenet_proj= []
 
 
+
 epsilons_lenet = np.arange(0, 0.5, 0.05)
 criterion = torch.nn.CrossEntropyLoss()
+
+
+epsilons_fgsm = np.arange(0, 0.5, 0.05)
+
+epsilons_pgd = []
+
+
+n = train_dataset.train_data.shape[1]*train_dataset.train_data.shape[2] # [0] is nunber of rows, [1-2] are the dimensions of each image
+# Thus n is the dimension of each image, which we need to scale the L2 norm for Projected Gradient Descent
+
+
+# From source https://adversarial-ml-tutorial.org/adversarial_examples/ for L2 PGD
+scaler = np.sqrt(2*n)/(np.sqrt(np.pi*np.exp(1)))
+for eps in epsilons_fgsm:
+    new_eps = eps*scaler
+    epsilons_pgd.append(new_eps)
+print(epsilons_pgd)
+
+
 
 epochs = 10
 batch_size = 32

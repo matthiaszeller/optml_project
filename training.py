@@ -133,7 +133,8 @@ def tune_optimizer(model: Module,
                    epochs: int,
                    search_grid: Dict[str, Iterable],
                    train_ratio: float = None,
-                   nfolds: int = None):
+                   nfolds: int = None,
+                   func = training):
     """
     Tune parameters of an optimizer. Evaluate performance either with train/test split, or kfold-CV.
 
@@ -195,7 +196,7 @@ def tune_optimizer(model: Module,
             # Instantiate optimizer
             optim = optim_fun(model.parameters(), **optim_params)
             # Train
-            losse_train, metric_train = training(model, train_loader, optim, loss_fun,
+            losse_train, metric_train = func(model, train_loader, optim, loss_fun,
                                                  metric_fun, epochs, device, batch_log_interval=0)
             # Test
             losse_test, metric_test = testing(model, test_loader, loss_fun, metric_fun, device)

@@ -74,6 +74,7 @@ def get_height_weight_gender(sub_sample=True, add_outlier=False):
 
     return height, weight, gender
 
+
 def load_results(fp:str, drop_cst_param: bool = True):
     """Returns a DataFrame from the tuning results and the columns of the DataFrame corresponding to hyperparameters."""
 
@@ -95,12 +96,10 @@ def load_results(fp:str, drop_cst_param: bool = True):
     
     return df, hyperparams
 
-def get_best_hyperparams(fp:str):
+
+def get_best_hyperparams(fp: str, get_performance: bool = True):
     """Get best set of hyperparameters for any optimizer."""
-    if 'nesterov' not in fp:
-        df, params = load_results(fp, drop_cst_param=False)
-    else:
-        df, params = load_results(fp)
+    df, params = load_results(fp, drop_cst_param=False)
 
     ind = 0
     epsilon = 1e-8
@@ -113,8 +112,11 @@ def get_best_hyperparams(fp:str):
             
             ind = int(idx)              
     res_dict = df.iloc[ind][params].to_dict()
-    res_dict['metric_test_std'] = best_res['metric_test_std']
-    res_dict['metric_test'] = best_res['metric_test_act']
+
+    if get_performance:
+        res_dict['metric_test_std'] = best_res['metric_test_std']
+        res_dict['metric_test'] = best_res['metric_test_act']
+
     return res_dict
 
 

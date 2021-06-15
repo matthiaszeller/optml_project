@@ -15,8 +15,8 @@ test_dataset_s = datasets.MNIST("../data", train=False, download=True, transform
 # train_loader_s = DataLoader(train_dataset_s, batch_size = 100, shuffle=False)
 # test_loader_s = DataLoader(test_dataset_s, batch_size = 100, shuffle=False)
 
-train_loader_s = DataLoader(TensorDataset(train_dataset_s.data[:, None, :], train_dataset_s.targets), batch_size=100)
-test_loader_s = DataLoader(TensorDataset(test_dataset_s.data[:, None, :], test_dataset_s.targets), batch_size=100)
+train_loader_s = DataLoader(TensorDataset(train_dataset_s.data[:, None, :], train_dataset_s.targets), batch_size=1)
+test_loader_s = DataLoader(TensorDataset(test_dataset_s.data[:, None, :], test_dataset_s.targets), batch_size=1)
 
 epsilons_fgsm = np.arange(0, 0.5, 0.05)
 
@@ -37,7 +37,7 @@ accuracies_naive_proj = []
 criterion = torch.nn.CrossEntropyLoss()
 
 epochs = 10
-batch_size = 100
+batch_size = 1
 learning_rate = 0.01
 decreasing_lr = False
 use_cuda = True # GPU seems to raise erros on my side
@@ -83,6 +83,11 @@ for it in range(length_x):
     print(tens_a.shape)
     print(tens_b.shape)
     x_bool = torch.all(tens_a.eq(tens_b))
+    torch.set_printoptions(edgeitems=10000)
+    print(tens_a)
+    print(tens_b)
+    torch.set_printoptions(edgeitems=3)
+    
 print(x_bool)
 
 

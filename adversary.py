@@ -14,7 +14,7 @@ from training import accuracy
 def norms(Z):
     """Compute norms over all but the first dimension"""
     # Taken from the Source. This function is used to project to the l-2 ball
-    return Z.view(Z.shape[0], -1).norm(dim=1)[:,None,None,None]
+    return Z.view(Z.shape[0], -1).norm(dim=1)[:, None, None, None]
 
 
 def projected_gd(model, loss_fun, x, y, epsilon, alpha, num_iter):
@@ -24,18 +24,26 @@ def projected_gd(model, loss_fun, x, y, epsilon, alpha, num_iter):
         loss = loss_fun(model(x + delta), y)
         loss.backward()
         # Normalise the Grad
-        delta.data += alpha*delta.grad.detach() / norms(delta.grad.detach())
+        delta.data += alpha * delta.grad.detach() / norms(delta.grad.detach())
         # Clip the resulting x+delta to be between 0 and 1
-        delta.data = torch.min(torch.max(delta.detach(), -x), 1-x)
+        delta.data = torch.min(torch.max(delta.detach(), -x), 1 - x)
         # Project on to the L2 Norm
         delta.data *= epsilon / norms(delta.detach()).clamp(min=epsilon)
         delta.grad.zero_()
-    
-    adverserial_image = x+ delta.detach()
+
+    adverserial_image = x + delta.detach()
     return adverserial_image
 
 
-def projected_attack(model: Module, loss_fun: Module, metric_fun: Callable, test_loader: Iterable, epsilon:float, alpha:float, num_iter:int, device):
+def projected_attack(model: Module,
+                     loss_fun: Module,
+                     metric_fun: Callable,
+                     test_loader: Iterable,
+                     epsilon: float,
+                     alpha: float,
+                     num_iter: int,
+                     device,
+                     verbose: bool = True):
     # TODO add accuracy (and remove import)
     """
     Attack a trained neural net with projected GD
@@ -54,17 +62,19 @@ def projected_attack(model: Module, loss_fun: Module, metric_fun: Callable, test
 
         adversarial_accuracy = metric_fun(yhat_adv, y)
         loss = loss_fun(yhat_adv, y)
-        
+
         metrics.append(adversarial_accuracy)
         losses.append(loss.item())
     # Assuming unchanged Batch
     average_accuracy = sum(metrics) / len(metrics)
 
-    print("Epsilon: {:.2f}\tTest Accuracy = {:.3f}".format(epsilon, average_accuracy))
+    if verbose:
+        print("Epsilon: {:.2f}\tTest Accuracy = {:.3f}".format(epsilon, average_accuracy))
 
     return losses, average_accuracy
 
-## Taken from https://pytorch.org/tutorials/beginner/fgsm_tutorial.html 
+
+## Taken from https://pytorch.org/tutorials/beginner/fgsm_tutorial.html
 # and Lab 10 – Adversarial Robustness(https://colab.research.google.com/drive/1w697nylLw72aFcBEKu7j3yCm6RdpzOi6#scrollTo=eoE7_FDHHkat)
 
 
@@ -81,8 +91,14 @@ def fgsm(image: Tensor, grad_torch: Tensor, epsilon: float):
     return adverserial_image
 
 
-def attack(model: Module, loss_fun: Module, metric_fun: Callable, test_loader: Iterable, epsilon: float, device):
-    # TODO add accuracy (and remove import)
+def attack(model: Module,
+           loss_fun: Module,
+           metric_fun:
+           Callable,
+           test_loader: Iterable,
+           epsilon: float,
+           device,
+           verbose: bool = True):
     """
     Attack a trained neural net
     """
@@ -115,19 +131,21 @@ def attack(model: Module, loss_fun: Module, metric_fun: Callable, test_loader: I
     # Assuming unchanged Batch
     average_accuracy = sum(metrics) / len(metrics)
 
-    print("Epsilon: {:.2f}\tTest Accuracy = {:.3f}".format(epsilon, average_accuracy))
+    if verbose:
+        print("Epsilon: {:.2f}\tTest Accuracy = {:.3f}".format(epsilon, average_accuracy))
 
     return losses, average_accuracy
 
 
-def protected_training(model: Module, dataset: Iterable, optim: Optimizer, loss_fun: Module, metric_fun: Callable = None,
-            epochs: int = 10, device=None, batch_log_interval: int = 100):
+def protected_training(model: Module, dataset: Iterable, optim: Optimizer, loss_fun: Module,
+                       metric_fun: Callable = None,
+                       epochs: int = 10, device=None, batch_log_interval: int = 100):
     """
     Protects a model with a chosen optimiser against FGSM.
     """
     losses_epoch = []
     metrics_epoch = []
-    epsilon= 0.25 #Constant for now
+    epsilon = 0.25  # Constant for now
     t = time()
 
     for epoch in range(epochs):

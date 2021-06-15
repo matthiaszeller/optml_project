@@ -48,12 +48,24 @@ def train_epoch(model: Module, dataset: Iterable, optim: Optimizer, loss_fun: Mo
 
 def training(model: Module, dataset: Iterable, optim: Optimizer, loss_fun: Module, metric_fun: Callable = None,
              epochs: int = 10, device=None, batch_log_interval: int = 100):
+    """
+
+    :param model:
+    :param dataset:
+    :param optim:
+    :param loss_fun:
+    :param metric_fun:
+    :param epochs:
+    :param device:
+    :param batch_log_interval: -1 means no print per epoch, 0 means print epoch avg only, > 0 is batch interval
+    :return:
+    """
     if metric_fun is None:
         metric_fun = lambda *args: None
     if device is None:
         device = torch.device('cpu')
 
-    print(f'Launching training on {device}')
+    print(f'Launching training on {device}', end=' ', flush=True)
     losses_epoch = []
     metrics_epoch = []
     model.train()
@@ -63,7 +75,10 @@ def training(model: Module, dataset: Iterable, optim: Optimizer, loss_fun: Modul
         losses_epoch.append(losses)
         metrics_epoch.append(metrics)
         print_metric = '' if metric_fun is None else f'\tavg epoch acc = {np.mean(metrics):.4}'
-        print(f'epoch {epoch}\tavg epoch loss = {np.mean(losses):.4}{print_metric}')
+        if batch_log_interval >= 0:
+            print(f'epoch {epoch}\tavg epoch loss = {np.mean(losses):.4}{print_metric}')
+        else:
+            print('', end='. ', flush=True)
 
     t = time() - t
     print(f'training took {t:.4} s')

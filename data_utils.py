@@ -82,6 +82,7 @@ def load_results(fp:str, drop_cst_param: bool = True):
         
     df = pd.DataFrame(res)
     hyperparams = df.columns.drop(['loss_train', 'metric_train', 'loss_test', 'metric_test'])
+
     # Average over folds
     df.loss_train = df.loss_train.apply(lambda e: np.array(e).mean(axis=0))
     df.metric_train = df.metric_train.apply(lambda e: np.array(e).mean(axis=0))
@@ -103,12 +104,17 @@ def get_best_hyperparams(fp:str):
 
     ind = 0
     epsilon = 1e-8
-    best_res = {'metric_test' : -float('inf')}
+    best_res = {'metric_test' : -float('inf'), 'metric_test_act': 0.0, 'metric_test_std': 0.0}
     for idx, row in df.iterrows():
         if (row.metric_test/ (row['metric_test_std'] + epsilon)) > best_res['metric_test']:
-            best_res['metric_test'] = row.metric_test/ (row['metric_test_std'] + epsilon)
+            best_res['metric_test'] = row.metric_test / (row['metric_test_std'] + epsilon)
+            best_res['metric_test_std'] = row['metric_test_std']
+            best_res['metric_test_act'] = row.metric_test
+            
             ind = int(idx)              
-
-    return df.iloc[ind][params].to_dict()
+    res_dict = df.iloc[ind][params].to_dict()
+    res_dict['metric_test_std'] = best_res['metric_test_std']
+    res_dict['metric_test'] = best_res['metric_test_act']
+    return res_dict
 
 

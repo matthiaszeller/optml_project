@@ -23,14 +23,15 @@ def projected_gd(model, loss_fun, x, y, epsilon, alpha, num_iter):
     for t in range(num_iter):
         loss = loss_fun(model(x + delta), y)
         loss.backward()
+        # Normalise the Grad
         delta.data += alpha*delta.grad.detach() / norms(delta.grad.detach())
-        delta.data = torch.min(torch.max(delta.detach(), -x), 1-x) # clip X+delta to [0,1]
+        # Clip the resulting x+delta to be between 0 and 1
+        delta.data = torch.min(torch.max(delta.detach(), -x), 1-x)
+        # Project on to the L2 Norm
         delta.data *= epsilon / norms(delta.detach()).clamp(min=epsilon)
         delta.grad.zero_()
     
     adverserial_image = x+ delta.detach()
-    adverserial_image = torch.clamp(adverserial_image, 0, 1)
-    # Sent back an adverserial image
     return adverserial_image
 
 

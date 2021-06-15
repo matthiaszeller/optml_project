@@ -1,3 +1,4 @@
+from os import X_OK
 from adversary import *
 from net import Net
 import numpy as np
@@ -7,39 +8,36 @@ from training import training, testing, accuracy
 from optimizer import MiniBatchOptimizer
 import matplotlib.pyplot as plt
 from data_utils import get_mnist, build_data_loaders
+from torchvision import datasets, transforms
+from torch.utils.data import DataLoader, TensorDataset
+train_dataset_s = datasets.MNIST("../data", train=True, download=True, transform=transforms.ToTensor())
+test_dataset_s = datasets.MNIST("../data", train=False, download=True, transform=transforms.ToTensor())
+# train_loader_s = DataLoader(train_dataset_s, batch_size = 100, shuffle=False)
+# test_loader_s = DataLoader(test_dataset_s, batch_size = 100, shuffle=False)
 
-
-train_dataset, test_dataset = get_mnist(normalize=True)
-accuracies_lenet= []
-accuracies_lenet_alt= []
-accuracies_lenet_proj= []
-
-
-
-epsilons_lenet = np.arange(0, 0.5, 0.05)
-criterion = torch.nn.CrossEntropyLoss()
-
+train_loader_s = DataLoader(TensorDataset(train_dataset_s.data[:, None, :], train_dataset_s.targets), batch_size=100)
+test_loader_s = DataLoader(TensorDataset(test_dataset_s.data[:, None, :], test_dataset_s.targets), batch_size=100)
 
 epsilons_fgsm = np.arange(0, 0.5, 0.05)
 
-epsilons_pgd = []
+epsilons_proj = []
 
-
-n = train_dataset.train_data.shape[1]*train_dataset.train_data.shape[2] # [0] is nunber of rows, [1-2] are the dimensions of each image
-# Thus n is the dimension of each image, which we need to scale the L2 norm for Projected Gradient Descent
-
+n = 784 # Thus n is the dimension of each image, which we need to scale the L2 norm for Projected Gradient Descent
 
 # From source https://adversarial-ml-tutorial.org/adversarial_examples/ for L2 PGD
 scaler = np.sqrt(2*n)/(np.sqrt(np.pi*np.exp(1)))
 for eps in epsilons_fgsm:
     new_eps = eps*scaler
-    epsilons_pgd.append(new_eps)
-print(epsilons_pgd)
+    epsilons_proj.append(new_eps)
 
 
+accuracies_naive_fgsm = []
+accuracies_naive_proj = []
+
+criterion = torch.nn.CrossEntropyLoss()
 
 epochs = 10
-batch_size = 32
+batch_size = 100
 learning_rate = 0.01
 decreasing_lr = False
 use_cuda = True # GPU seems to raise erros on my side
@@ -47,8 +45,89 @@ device = torch.device('cuda' if use_cuda and torch.cuda.is_available() else 'cpu
 
 
 net_naive = Net().to(device)
+
+train_dataset, test_dataset = get_mnist(normalize=False)
 train_loader, test_loader = build_data_loaders(train_dataset, test_dataset, batch_size)
 
+# Compare
+print(torch.all(train_dataset_s.data.eq(train_dataset.data)))
+
+print(torch.all(test_dataset_s.data.eq(test_dataset.data)))
+
+x_o = []
+x_s = []
+y_o = []
+y_s = []
+
+x_bool = True
+y_bool = True
+x_sbool = True
+y_sbool = True
+
+for _, (x,y) in enumerate(train_loader):
+    x_o.append(x)
+    y_o.append(y)
+
+for _, (x,y) in enumerate(train_loader_s):
+    x_s.append(x)
+    y_s.append(y)
+
+length_x = len(x_o)
+length_y = len(y_o)
+length_x = len(x_s)
+length_y = len(y_s)
+
+for it in range(length_x):
+    tens_a = x_o[it]
+    tens_b = x_s[it]
+    print(tens_a.shape)
+    print(tens_b.shape)
+    x_bool = torch.all(tens_a.eq(tens_b))
+print(x_bool)
+
+
+for it in range(length_y):
+    tens_a = y_o[it]
+    tens_b = y_s[it]
+    y_bool = y_bool and torch.all(tens_a.eq(tens_b))
+
+print(y_bool)
+
+print("********************************")
+
+x_o = []
+x_s = []
+y_o = []
+y_s = []
+x_bool = True
+y_bool = True
+length_x = len(x_o)
+length_y = len(y_o)
+
+for _, (x,y) in enumerate(test_loader):
+    x_o.append(x)
+    y_o.append(y)
+
+for _, (x,y) in enumerate(test_loader_s):
+    x_s.append(x)
+    y_s.append(y)
+
+length_x = len(x_o)
+length_y = len(y_o)
+
+for it in range(length_x):
+    tens_a = x_o[it]
+    tens_b = x_s[it]
+    x_bool = x_bool and torch.all(tens_a.eq(tens_b))
+
+print(x_bool)
+
+
+for it in range(length_y):
+    tens_a = y_o[it]
+    tens_b = y_s[it]
+    y_bool = y_bool and torch.all(tens_a.eq(tens_b))
+print(y_bool)
 
 mini_opt = MiniBatchOptimizer(net_naive.parameters(), lr=learning_rate, decreasing_lr=decreasing_lr)
 losses, acc = training(net_naive, train_loader, mini_opt, criterion, accuracy, epochs=epochs, device=device)
@@ -57,33 +136,44 @@ losses, acc = testing(net_naive, test_loader, criterion, accuracy, device=device
 
 # Attack Naive Model
 print("********************************")
+
 print("Standard Attack")
-for eps in epsilons_lenet:
+for eps in epsilons_fgsm:
     loss_attack, acc_attack  = attack(net_naive, criterion, accuracy, test_loader, epsilon=eps, device=device)
-    accuracies_lenet.append(acc_attack)
+    accuracies_naive_fgsm.append(acc_attack)
+print("********************************")
+for eps in epsilons_fgsm:
+    loss_attack, acc_attack  = attack(net_naive, criterion, accuracy, test_loader_s, epsilon=eps, device=device)
 
 
 # Attack Naive Model
 print("********************************")
-print("Alternate Attack")
-for eps in epsilons_lenet:
-    loss_attack, acc_attack  = fgsm_attack(net_naive, criterion, accuracy, test_loader, epsilon=eps, device=device)
-    accuracies_lenet_alt.append(acc_attack)
+for X,y in test_loader:
+    X,y = X.to(device), y.to(device)
+    break
+delta = torch.zeros_like(X, requires_grad=True)
+loss = criterion(net_naive(X + delta), y)
+loss.backward()
+print(delta.grad.abs().mean().item())
 
-# Attack Naive Model
-print("********************************")
 print("Projected Attack")
-for eps in epsilons_lenet:
-    loss_attack, acc_attack  = projected_attack(net_naive, criterion, accuracy, test_loader, epsilon=eps, alpha=1e-2, num_iter=40, device=device)
-    accuracies_lenet_proj.append(acc_attack)
+for eps in epsilons_proj:
+    loss_attack, acc_attack  = projected_attack(net_naive, criterion, accuracy, test_loader, epsilon=eps, alpha=1, num_iter=40, device=device)
+    accuracies_naive_proj.append(acc_attack)
+print("********************************")
+for eps in epsilons_proj:
+    loss_attack, acc_attack  = projected_attack(net_naive, criterion, accuracy, test_loader_s, epsilon=eps, alpha=0.1, num_iter=40, device=device)
+
 
 # Robust v1
 robust_net = Net().to(device)
 protect_epochs = 10
 protect_lr = 0.01
-protect_bz = 32
+protect_bz = 100
 protect_dec_lr = False
-prot_train_loader, prot_test_loader = build_data_loaders(train_dataset, test_dataset, protect_bz)
+prot_train_loader = DataLoader(train_dataset, batch_size = protect_bz, shuffle=True)
+prot_test_loader = DataLoader(test_dataset, batch_size = protect_bz, shuffle=False)
+
 mini_opt_proc = MiniBatchOptimizer(robust_net.parameters(), lr=protect_lr, decreasing_lr=protect_dec_lr)
 
 loss_train, acc_train = protected_training(robust_net, prot_train_loader, mini_opt_proc, criterion, accuracy, epochs=protect_epochs, device=device)
@@ -91,101 +181,41 @@ loss_test, acc_test = testing(robust_net, test_loader, criterion, accuracy, devi
 print("Success")
 
 # Attack against Protected Model
-accuracies_lenet_rb= []
-accuracies_lenet_alt_rb= []
-accuracies_lenet_proj_rb= []
+accuracies_robust_fgsm = []
+accuracies_robust_proj = []
 
-
-epsilons_lenet_robust = np.arange(0, 0.5, 0.05)
-# Attack Robust Model
-print("********************************")
-print("Standard Attack")
-for eps in epsilons_lenet:
-    loss_attack, acc_attack  = attack(robust_net, criterion, accuracy, test_loader, epsilon=eps, device=device)
-    accuracies_lenet_rb.append(acc_attack)
 
 # Attack Robust Model
 print("********************************")
-print("Alternate Attack")
-for eps in epsilons_lenet:
-    loss_attack, acc_attack  = fgsm_attack(robust_net, criterion, accuracy, test_loader, epsilon=eps, device=device)
-    accuracies_lenet_alt_rb.append(acc_attack)
+losses, acc = attack(robust_net, criterion, accuracy, prot_test_loader, epsilon=0.1, device=device)
+print("Robust Net: ", acc)
+
+for eps in epsilons_fgsm:
+    loss_attack, acc_attack  = attack(robust_net, criterion, accuracy, prot_test_loader, epsilon=eps, device=device)
+    accuracies_robust_fgsm.append(acc_attack)
 
 # Attack Robust Model
 print("********************************")
-print("Projected Attack")
-for eps in epsilons_lenet:
-    loss_attack, acc_attack  = projected_attack(robust_net, criterion, accuracy, test_loader, epsilon=eps, alpha=1e-2, num_iter=40, device=device)
-    accuracies_lenet_proj_rb.append(acc_attack)
+losses, acc = projected_attack(robust_net, criterion, accuracy, prot_test_loader, epsilon=2, alpha=1e-1, num_iter=40, device=device)
+print("Robust Net: ", acc)
+
+for eps in epsilons_proj:
+    loss_attack, acc_attack  = projected_attack(robust_net, criterion, accuracy, prot_test_loader, epsilon=eps, alpha=1e-2, num_iter=40, device=device)
+    accuracies_robust_proj.append(acc_attack)
 
 
-# Robust v2
-robustest_net = Net().to(device)
-protect_epochs = 10
-protect_lr = 0.01
-protect_bz = 32
-protect_dec_lr = False
-prot_train_loader, prot_test_loader = build_data_loaders(train_dataset, test_dataset, protect_bz)
-mini_opt_proc = MiniBatchOptimizer(robustest_net.parameters(), lr=protect_lr, decreasing_lr=protect_dec_lr)
-
-loss_train, acc_train = protected_training_alt(robustest_net, prot_train_loader, mini_opt_proc, criterion, accuracy, epochs=protect_epochs, device=device)
-loss_test, acc_test = testing(robustest_net, test_loader, criterion, accuracy, device=device)
-print("Success")
-
-# Attack against Protected Model
-accuracies_lenet_rb_2= []
-accuracies_lenet_alt_rb_2= []
-accuracies_lenet_proj_rb_2= []
 
 
-epsilons_lenet_robust = np.arange(0, 0.5, 0.05)
-# Attack Robust Model
 print("********************************")
-print("Standard Attack")
-for eps in epsilons_lenet:
-    loss_attack, acc_attack  = attack(robustest_net, criterion, accuracy, test_loader, epsilon=eps, device=device)
-    accuracies_lenet_rb_2.append(acc_attack)
-
-# Attack Robust Model
-print("********************************")
-print("Alternate Attack")
-for eps in epsilons_lenet:
-    loss_attack, acc_attack  = fgsm_attack(robustest_net, criterion, accuracy, test_loader, epsilon=eps, device=device)
-    accuracies_lenet_alt_rb_2.append(acc_attack)
-
-# Attack Robust Model
-print("********************************")
-print("Projected Attack")
-for eps in epsilons_lenet:
-    loss_attack, acc_attack  = projected_attack(robustest_net, criterion, accuracy, test_loader, epsilon=eps, alpha=1e-2, num_iter=40, device=device)
-    accuracies_lenet_proj_rb_2.append(acc_attack)
-
-print("Success")
-print("********************************")
-for entry in  accuracies_lenet:
+for entry in  accuracies_naive_fgsm:
     print(entry)
 print("********************************")
-for entry in  accuracies_lenet_alt:
+for entry in  accuracies_naive_proj:
     print(entry)
 print("********************************")
-for entry in  accuracies_lenet_proj:
+for entry in  accuracies_robust_fgsm:
     print(entry)
 print("********************************")
-for entry in  accuracies_lenet_rb:
-    print(entry)
-print("********************************")
-for entry in  accuracies_lenet_alt_rb:
-    print(entry)
-print("********************************")
-for entry in  accuracies_lenet_proj_rb:
-    print(entry)
-print("********************************")
-for entry in  accuracies_lenet_rb_2:
-    print(entry)
-print("********************************")
-for entry in  accuracies_lenet_alt_rb_2:
-    print(entry)
-print("********************************")
-for entry in  accuracies_lenet_proj_rb_2:
+for entry in  accuracies_robust_proj:
     print(entry)
     

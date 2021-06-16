@@ -6,32 +6,27 @@ from torch.functional import Tensor
 from torch.nn import Module
 from torch.optim import Optimizer
 
-# TODO remove
-from training import accuracy
-
 
 ## Source: https://adversarial-ml-tutorial.org/adversarial_examples/
-def norms(Z):
-    """Compute norms over all but the first dimension"""
-    # Taken from the Source. This function is used to project to the l-2 ball
-    return Z.view(Z.shape[0], -1).norm(dim=1)[:, None, None, None]
-
-
-def projected_gd(model, loss_fun, x, y, epsilon, alpha, num_iter):
+def projected_gd(model: Module,
+                 loss_fun: Module,
+                 image:Tensor,
+                 label:Tensor,
+                 epsilon:float,
+                 alpha:float,
+                 num_iter:int):
     """ Construct FGSM adversarial examples on the examples X"""
-    delta = torch.zeros_like(x, requires_grad=True)
+    pertubation = torch.zeros_like(image, requires_grad=True)
+    # Run iterative PGD. Amounts to make many small FGSM steps
+    # Then add the calculated pertubation to the original image and return the result
     for t in range(num_iter):
-        loss = loss_fun(model(x + delta), y)
+        loss = loss_fun(model(image + pertubation), label)
         loss.backward()
-        # Normalise the Grad
-        delta.data += alpha * delta.grad.detach() / norms(delta.grad.detach())
-        # Clip the resulting x+delta to be between 0 and 1
-        delta.data = torch.min(torch.max(delta.detach(), -x), 1 - x)
-        # Project on to the L2 Norm
-        delta.data *= epsilon / norms(delta.detach()).clamp(min=epsilon)
-        delta.grad.zero_()
+        # PGD on L-Infinity Norm
+        pertubation.data = (pertubation + alpha*pertubation.grad.detach().sign()).clamp(-epsilon,epsilon)
+        pertubation.grad.zero_()
 
-    adverserial_image = x + delta.detach()
+    adverserial_image = image + pertubation.detach()
     return adverserial_image
 
 
@@ -44,7 +39,6 @@ def projected_attack(model: Module,
                      num_iter: int,
                      device,
                      verbose: bool = True):
-    # TODO add accuracy (and remove import)
     """
     Attack a trained neural net with projected GD
     """
@@ -77,8 +71,9 @@ def projected_attack(model: Module,
 ## Taken from https://pytorch.org/tutorials/beginner/fgsm_tutorial.html
 # and Lab 10 – Adversarial Robustness(https://colab.research.google.com/drive/1w697nylLw72aFcBEKu7j3yCm6RdpzOi6#scrollTo=eoE7_FDHHkat)
 
-
-def fgsm(image: Tensor, grad_torch: Tensor, epsilon: float):
+def fgsm(image: Tensor,
+         grad_torch: Tensor,
+         epsilon: float):
     """
     Creates an adverserial version of an inputted image
     """

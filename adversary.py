@@ -182,7 +182,11 @@ def protected_training(model: Module, dataset: Iterable, optim: Optimizer, loss_
         losses_epoch.append(losses)
         metrics_epoch.append(metrics)
         print_metric = '' if metric_fun is None else f'\tavg epoch acc = {np.mean(metrics):.4}'
-        print(f'Epoch {epoch}\tavg epoch Loss = {np.mean(losses):.4}{print_metric}')
+        if batch_log_interval >= 0:
+            print(f'epoch {epoch}\tavg epoch loss = {np.mean(losses):.4}{print_metric}')
+        else:
+            print('', end='. ', flush=True)
+
     t = time() - t
     print(f'training took {t:.4} s')
     if metric_fun is None:

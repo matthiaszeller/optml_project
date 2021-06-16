@@ -56,12 +56,9 @@ loss.backward()
 print(delta.grad.abs().mean().item())
 
 print("Projected Attack")
-for eps in epsilons_proj:
+for eps in epsilons:
     loss_attack, acc_attack  = projected_attack(net_naive, criterion, accuracy, test_loader, epsilon=eps, alpha=1, num_iter=40, device=device)
     accuracies_naive_proj.append(acc_attack)
-print("********************************")
-for eps in epsilons_proj:
-    loss_attack, acc_attack  = projected_attack(net_naive, criterion, accuracy, test_loader_s, epsilon=eps, alpha=0.1, num_iter=40, device=device)
 
 
 # Robust v1
@@ -70,9 +67,7 @@ protect_epochs = 10
 protect_lr = 0.01
 protect_bz = 100
 protect_dec_lr = False
-prot_train_loader = DataLoader(train_dataset, batch_size = protect_bz, shuffle=True)
-prot_test_loader = DataLoader(test_dataset, batch_size = protect_bz, shuffle=False)
-
+prot_train_loader, prot_test_loader = build_data_loaders(train_dataset, test_dataset, batch_size)
 mini_opt_proc = MiniBatchOptimizer(robust_net.parameters(), lr=protect_lr, decreasing_lr=protect_dec_lr)
 
 loss_train, acc_train = protected_training(robust_net, prot_train_loader, mini_opt_proc, criterion, accuracy, epochs=protect_epochs, device=device)
@@ -98,7 +93,7 @@ print("********************************")
 losses, acc = projected_attack(robust_net, criterion, accuracy, prot_test_loader, epsilon=2, alpha=1e-1, num_iter=40, device=device)
 print("Robust Net: ", acc)
 
-for eps in epsilons_proj:
+for eps in epsilons:
     loss_attack, acc_attack  = projected_attack(robust_net, criterion, accuracy, prot_test_loader, epsilon=eps, alpha=1e-2, num_iter=40, device=device)
     accuracies_robust_proj.append(acc_attack)
 

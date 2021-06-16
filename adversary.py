@@ -81,7 +81,8 @@ def fgsm(image: Tensor,
     grad_sign = grad_torch.sign()
     # Create an adverserial example, by perturbing the image in the direction of the gradient 
     adverserial_image = image + epsilon * grad_sign
-    adverserial_image = torch.clamp(adverserial_image, 0, 1)
+    # We do not clamp, because we normalise the dataset, not to be between 0-1 but based on the mu and st. dev.
+    # Additionally, we focus on fooling the classifier and ignore the effect this might have on the human observer
     # Sent back an adverserial image
     return adverserial_image
 

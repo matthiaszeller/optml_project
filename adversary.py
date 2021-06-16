@@ -7,7 +7,7 @@ from torch.nn import Module
 from torch.optim import Optimizer
 
 
-## Source: https://adversarial-ml-tutorial.org/adversarial_examples/
+## Based on: https://adversarial-ml-tutorial.org/adversarial_examples/
 def projected_gd(model: Module,
                  loss_fun: Module,
                  image:Tensor,
@@ -68,8 +68,8 @@ def projected_attack(model: Module,
     return losses, average_accuracy
 
 
-## Taken from https://pytorch.org/tutorials/beginner/fgsm_tutorial.html
-# and Lab 10 – Adversarial Robustness(https://colab.research.google.com/drive/1w697nylLw72aFcBEKu7j3yCm6RdpzOi6#scrollTo=eoE7_FDHHkat)
+## Based on https://pytorch.org/tutorials/beginner/fgsm_tutorial.html
+# and Lab 10 – Adversarial Robustness(https://github.com/epfml/ML_course/blob/master/labs/ex10/solution/ex10.ipynb)
 
 def fgsm(image: Tensor,
          grad_torch: Tensor,

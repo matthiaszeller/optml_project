@@ -8,27 +8,9 @@ from training import training, testing, accuracy
 from optimizer import MiniBatchOptimizer
 import matplotlib.pyplot as plt
 from data_utils import get_mnist, build_data_loaders
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader, TensorDataset
-train_dataset_s = datasets.MNIST("../data", train=True, download=True, transform=transforms.ToTensor())
-test_dataset_s = datasets.MNIST("../data", train=False, download=True, transform=transforms.ToTensor())
-# train_loader_s = DataLoader(train_dataset_s, batch_size = 100, shuffle=False)
-# test_loader_s = DataLoader(test_dataset_s, batch_size = 100, shuffle=False)
+train_dataset, test_dataset = get_mnist(normalize=True)
 
-train_loader_s = DataLoader(TensorDataset(train_dataset_s.data[:, None, :], train_dataset_s.targets), batch_size=1)
-test_loader_s = DataLoader(TensorDataset(test_dataset_s.data[:, None, :], test_dataset_s.targets), batch_size=1)
-
-epsilons_fgsm = np.arange(0, 0.5, 0.05)
-
-epsilons_proj = []
-
-n = 784 # Thus n is the dimension of each image, which we need to scale the L2 norm for Projected Gradient Descent
-
-# From source https://adversarial-ml-tutorial.org/adversarial_examples/ for L2 PGD
-scaler = np.sqrt(2*n)/(np.sqrt(np.pi*np.exp(1)))
-for eps in epsilons_fgsm:
-    new_eps = eps*scaler
-    epsilons_proj.append(new_eps)
+epsilons = np.arange(0, 0.5, 0.05)
 
 
 accuracies_naive_fgsm = []
@@ -37,17 +19,16 @@ accuracies_naive_proj = []
 criterion = torch.nn.CrossEntropyLoss()
 
 epochs = 10
-batch_size = 1
+batch_size = 100
 learning_rate = 0.01
 decreasing_lr = False
 use_cuda = True # GPU seems to raise erros on my side
 device = torch.device('cuda' if use_cuda and torch.cuda.is_available() else 'cpu')
-
+train_loader, test_loader = build_data_loaders(train_dataset, test_dataset, batch_size)
 
 net_naive = Net().to(device)
 
-train_dataset, test_dataset = get_mnist(normalize=False)
-train_loader, test_loader = build_data_loaders(train_dataset, test_dataset, batch_size)
+
 
 mini_opt = MiniBatchOptimizer(net_naive.parameters(), lr=learning_rate, decreasing_lr=decreasing_lr)
 losses, acc = training(net_naive, train_loader, mini_opt, criterion, accuracy, epochs=epochs, device=device)
@@ -58,12 +39,10 @@ losses, acc = testing(net_naive, test_loader, criterion, accuracy, device=device
 print("********************************")
 
 print("Standard Attack")
-for eps in epsilons_fgsm:
+for eps in epsilons:
     loss_attack, acc_attack  = attack(net_naive, criterion, accuracy, test_loader, epsilon=eps, device=device)
     accuracies_naive_fgsm.append(acc_attack)
 print("********************************")
-for eps in epsilons_fgsm:
-    loss_attack, acc_attack  = attack(net_naive, criterion, accuracy, test_loader_s, epsilon=eps, device=device)
 
 
 # Attack Naive Model
@@ -110,7 +89,7 @@ print("********************************")
 losses, acc = attack(robust_net, criterion, accuracy, prot_test_loader, epsilon=0.1, device=device)
 print("Robust Net: ", acc)
 
-for eps in epsilons_fgsm:
+for eps in epsilons:
     loss_attack, acc_attack  = attack(robust_net, criterion, accuracy, prot_test_loader, epsilon=eps, device=device)
     accuracies_robust_fgsm.append(acc_attack)
 

@@ -15,7 +15,7 @@ def get_mnist(normalize=True, path='data'):
         path.mkdir()
 
     train = torchvision.datasets.MNIST(str(path), download=True, train=True, transform=torchvision.transforms.ToTensor())
-    test = torchvision.datasets.MNIST(str(path), train=False, transform=torchvision.transforms.ToTensor())
+    test = torchvision.datasets.MNIST(str(path), train=False, download=True, transform=torchvision.transforms.ToTensor())
 
     xtrain = train.data.to(torch.float32)
     xtest = test.data.to(torch.float32)

@@ -9,7 +9,9 @@ Impact of Optimisation Algorithm on Adversarial Training of a Neural Net for Ima
 ### Notebooks
 
 * [`Hyperparameter-tuning.ipynb`](Hyperparameter-tuning.ipynb)
+    * We used this during hyper-tuning to visualise the impact of hyper-parameters and refine our search grids. 
 * [`Pipeline.ipynb`](Pipeline.ipynb)
+    * This is the final version of our code and should be run to reproduce our results
 
 ### Codebase
 

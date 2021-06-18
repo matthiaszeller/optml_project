@@ -26,3 +26,5 @@ Impact of Optimisation Algorithm on Adversarial Training of a Neural Net for Ima
     *   projected_attacl: Function that uses PGD to attack model
 * `data_utils.py`: utilities to load the data
 
+### Report
+A copy of the pdf version of the Report is also included in the repository

@@ -2,12 +2,14 @@
 
 ## About
 
+Impact of Optimisation Algorithm on Adversarial Training of a Neural Net for Image Recognition.
+
 ## Project Struture
 
 ### Notebooks
 
-* `Hyperparameter-tuning.ipynb`
-* `Pipeline.ipynb`
+* [`Hyperparameter-tuning.ipynb`](Hyperparameter-tuning.ipynb)
+* [`Pipeline.ipynb`](Pipeline.ipynb)
 
 ### Codebase
 

@@ -22,5 +22,7 @@ Impact of Optimisation Algorithm on Adversarial Training of a Neural Net for Ima
     *   fgsm: Function that generates an adversarial image via Fast Gradient Sign Method
     *   attack: Function that uses fgsm to attack a model
     *   protect: Function trains a model using FGSM Adversarial Training
+    *   projected_gd: Function that generates an adversarial image via Projected Gradient Descent
+    *   projected_attacl: Function that uses PGD to attack model
 * `data_utils.py`: utilities to load the data
 
